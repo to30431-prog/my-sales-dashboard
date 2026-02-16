@@ -9,21 +9,45 @@ import streamlit.components.v1 as components
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="企業數位戰情室 (雲端旗艦版)", page_icon="📈", layout="wide")
 
-# --- 💅 CSS 美學核心 ---
+# --- 💅 CSS 美學核心 (修復手機深色模式問題) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif; }
     
-    /* KPI 卡片優化 */
-    div[data-testid="stMetric"], div[data-testid="metric-container"] {
-        background-color: #FFFFFF; border: 1px solid #E0E0E0; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: #333; transition: transform 0.2s;
+    /* 🔥 關鍵修復：強制所有文字為深黑色 (解決手機深色模式看不到字的問題) */
+    .stApp {
+        color: #333333 !important;
     }
-    div[data-testid="stMetric"]:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: #B0B0B0; }
     
-    /* 側邊欄 */
-    [data-testid="stSidebar"] { background-color: #F8F9FA; border-right: 1px solid #E0E0E0; }
+    /* 1. 側邊欄修復 */
+    [data-testid="stSidebar"] { 
+        background-color: #F8F9FA !important; 
+        border-right: 1px solid #E0E0E0;
+    }
+    /* 強制側邊欄裡面的所有文字(包含選項)變成深灰色 */
+    [data-testid="stSidebar"] * {
+        color: #333333 !important;
+    }
+    
+    /* 2. KPI 卡片修復 */
+    div[data-testid="stMetric"], div[data-testid="metric-container"] {
+        background-color: #FFFFFF !important; 
+        border: 1px solid #E0E0E0; 
+        padding: 15px; 
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+    }
+    /* 強制卡片裡的標題、數字、文字都變成深色 */
+    div[data-testid="stMetric"] label, 
+    div[data-testid="stMetric"] div, 
+    div[data-testid="stMetric"] p,
+    div[data-testid="stMetricValue"] div {
+        color: #333333 !important;
+    }
+    
+    /* KPI 卡片懸停效果 */
+    div[data-testid="stMetric"]:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: #B0B0B0; }
     
     /* 列印設定 */
     @media print {
