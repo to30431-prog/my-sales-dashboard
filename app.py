@@ -9,45 +9,44 @@ import streamlit.components.v1 as components
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="企業數位戰情室 (雲端旗艦版)", page_icon="📈", layout="wide")
 
-# --- 💅 CSS 美學核心 (修復手機深色模式問題) ---
+# --- 💅 CSS 美學核心 (多巴胺果凍活潑版 + 平板觸控優化) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Nunito', 'Noto Sans TC', sans-serif !important; }
     
-    /* 🔥 關鍵修復：強制所有文字為深黑色 (解決手機深色模式看不到字的問題) */
-    .stApp {
-        color: #333333 !important;
-    }
+    /* 強制全局文字顏色，避免手機/平板深色模式反白看不到 */
+    .stApp { color: #333333 !important; }
     
-    /* 1. 側邊欄修復 */
+    /* 側邊欄漸層與陰影 */
     [data-testid="stSidebar"] { 
-        background-color: #F8F9FA !important; 
-        border-right: 1px solid #E0E0E0;
+        background: linear-gradient(135deg, #FFF6E5 0%, #F0F4FF 100%) !important; 
+        border-right: none; 
+        box-shadow: 4px 0 15px rgba(0,0,0,0.05); 
     }
-    /* 強制側邊欄裡面的所有文字(包含選項)變成深灰色 */
-    [data-testid="stSidebar"] * {
-        color: #333333 !important;
-    }
+    [data-testid="stSidebar"] * { color: #333333 !important; }
     
-    /* 2. KPI 卡片修復 */
+    /* 🌟 導航按鈕 (果凍感) - 非常適合平板手指點擊 */
+    div.row-widget.stRadio > div { gap: 12px; }
+    div.row-widget.stRadio > div > label {
+        background-color: rgba(255, 255, 255, 0.7); padding: 15px 20px; border-radius: 30px; border: 2px solid transparent; cursor: pointer;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-weight: bold; color: #5D6D7E !important;
+    }
+    div.row-widget.stRadio > div > label:hover {
+        transform: translateY(-4px) scale(1.03); background: linear-gradient(120deg, #84FAB0 0%, #8FD3F4 100%); color: #0E6655 !important; border: 2px solid #FFFFFF; box-shadow: 0 10px 20px rgba(132, 250, 176, 0.4);
+    }
+    div.row-widget.stRadio > div > label > div:first-child { display: none; } /* 隱藏原本的小圓點 */
+    
+    /* 🌟 KPI 卡片果凍懸浮感 */
     div[data-testid="stMetric"], div[data-testid="metric-container"] {
-        background-color: #FFFFFF !important; 
-        border: 1px solid #E0E0E0; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        background: #FFFFFF !important; border: none; border-top: 6px solid #FF9A9E; padding: 20px; border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.06); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    /* 強制卡片裡的標題、數字、文字都變成深色 */
-    div[data-testid="stMetric"] label, 
-    div[data-testid="stMetric"] div, 
-    div[data-testid="stMetric"] p,
-    div[data-testid="stMetricValue"] div {
-        color: #333333 !important;
-    }
+    div[data-testid="stMetric"]:hover { transform: translateY(-8px); border-top: 6px solid #FECFEF; box-shadow: 0 15px 25px rgba(255, 154, 158, 0.25); }
+    div[data-testid="stMetric"] label, div[data-testid="stMetric"] div, div[data-testid="stMetric"] p, div[data-testid="stMetricValue"] div { color: #333333 !important; }
     
-    /* KPI 卡片懸停效果 */
-    div[data-testid="stMetric"]:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: #B0B0B0; }
+    /* 標題漸層色 */
+    h1, h2 { background: -webkit-linear-gradient(45deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; letter-spacing: 1px; }
+    h3, h4 { color: #2C3E50; font-weight: 700; }
     
     /* 列印設定 */
     @media print {
@@ -60,9 +59,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 核彈級檔案搜尋器 (不管檔案藏在哪一層資料夾，都能找到) ---
+# --- 🔍 核彈級檔案搜尋器 ---
 def find_file_recursive(target_names):
-    # 轉成小寫方便比對
     targets_lower = [t.lower() for t in target_names]
     for root, dirs, files in os.walk("."):
         for file in files:
@@ -70,21 +68,18 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 AI 數據載入引擎 ---
+# --- 🔥 數據載入引擎 ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
-        # 1. 搜尋主資料檔 (ZIP 或 CSV)
         zip_path = find_file_recursive(['All_Sales_5Years.zip', 'All_Sales_5years.zip', 'all_sales_5years.zip'])
         csv_path = find_file_recursive(['All_Sales_5Years.csv'])
         
         df = None
         
-        # A. 優先讀取 ZIP
         if zip_path:
             try:
                 with zipfile.ZipFile(zip_path, 'r') as z:
-                    # 找出 ZIP 裡唯一的 CSV (忽略 macOS 隱藏檔)
                     valid_files = [f for f in z.namelist() if f.lower().endswith('.csv') and not f.startswith('__')]
                     if valid_files:
                         target_csv = valid_files[0]
@@ -93,16 +88,12 @@ def load_data_final():
                             except: df = pd.read_csv(f, encoding='cp950', low_memory=False)
             except Exception as e:
                 return None, f"Zip 讀取失敗: {str(e)}", {}
-        
-        # B. 備案：讀取 CSV
         elif csv_path:
             try: df = pd.read_csv(csv_path, encoding='utf-8', low_memory=False)
             except: df = pd.read_csv(csv_path, encoding='cp950', low_memory=False)
-            
         else:
-            return None, "❌ 找不到資料檔 (請確認 GitHub 上有 All_Sales_5Years.zip)", {}
+            return None, "❌ 找不到資料檔", {}
 
-        # --- 數據清洗 ---
         if df is None: return None, "讀取後資料為空", {}
 
         df['OUTDATE'] = pd.to_datetime(df['OUTDATE'], format='%Y%m%d', errors='coerce')
@@ -111,7 +102,6 @@ def load_data_final():
         df['金額'] = pd.to_numeric(df['SUBTOT'], errors='coerce').fillna(0)
         df['數量'] = pd.to_numeric(df['OUTQTY'], errors='coerce').fillna(0)
         
-        # 產品編號偵測
         best_code_col = None
         priority_cols = [c for c in df.columns if c.upper() in ['IT_NO', 'ITEM_NO', 'P_NO', 'CODE', 'PROD_ID']]
         if priority_cols: best_code_col = priority_cols[0]
@@ -130,20 +120,17 @@ def load_data_final():
             df['產品編號'] = df[best_code_col].apply(extract_smart_code)
         else: df['產品編號'] = "Unknown"
 
-        # 品名偵測
         title_candidates = [c for c in df.columns if c.upper() in ['TITLE', 'NAME', 'PROD_NAME', 'DESCRIPTION', 'C_NAME']]
         best_name_col = title_candidates[0] if title_candidates else best_code_col
         if best_name_col: df['產品名稱'] = df[best_name_col].astype(str)
         else: df['產品名稱'] = df['產品編號']
         df['產品全名'] = "[" + df['產品編號'] + "] " + df['產品名稱']
 
-        # 系列拆解
         def split_prod_code(code):
             match = re.search(r"([a-zA-Z]+)[\s-]*(\d+)", str(code))
             return (match.group(1).upper(), int(match.group(2))) if match else ("N/A", 0)
         df['Prefix'], df['ProdNum'] = zip(*df['產品編號'].apply(split_prod_code))
 
-        # ID 清洗
         def super_clean(x):
             if pd.isna(x): return "None"
             s = str(x).strip()
@@ -151,15 +138,9 @@ def load_data_final():
             return s
         df['CUST_KEY'] = df['CUST_NO'].apply(super_clean)
         df['SALES_KEY'] = df['SUBNO'].apply(super_clean)
-
-        # ==========================================
-        # 2. 智慧讀取 DBF (搜尋所有可能的檔名)
-        # ==========================================
         
-        # --- 成本檔 (STOCK) ---
         cost_map = {}
         stock_path = find_file_recursive(['STOCK.DBF', 'stock.dbf', '股票代號 : DBF', '股票代號.DBF'])
-        
         if stock_path:
             try:
                 from dbfread import DBF
@@ -177,10 +158,8 @@ def load_data_final():
         df['總成本'] = df['單一成本'] * df['數量']
         df['毛利'] = df['金額'] - df['總成本']
         
-        # --- 業務檔 (LABORER) ---
         name_map = {}
         lab_path = find_file_recursive(['LABORER.DBF', 'laborer.dbf', '勞工.DBF', '勞工.dbf'])
-        
         if lab_path:
             try:
                 from dbfread import DBF
@@ -194,10 +173,8 @@ def load_data_final():
                     name_map = {**l_df.set_index('clean_key')[name_col].to_dict(), **l_df.set_index('zfill_key')[name_col].to_dict()}
             except: pass
 
-        # --- 客戶檔 (CUST) ---
         cust_map = {}
         cust_path = find_file_recursive(['CUST.DBF', 'cust.dbf', '客戶.DBF'])
-        
         if cust_path:
             try:
                 from dbfread import DBF
@@ -210,7 +187,6 @@ def load_data_final():
                     cust_map = c_df.set_index('clean_key')[c_na_col].to_dict()
             except: pass
 
-        # 應用對照表
         df['業務員'] = df['SALES_KEY'].map(name_map).fillna(df['SALES_KEY'])
         mask_sales_fail = df['業務員'] == df['SALES_KEY']
         if mask_sales_fail.any():
@@ -222,17 +198,14 @@ def load_data_final():
     except Exception as e:
         return None, str(e), {}
 
-# 載入
 result = load_data_final()
 if result[0] is not None: df, cost_map = result
 else: st.error(f"⚠️ 系統錯誤: {result[1]}"); st.stop()
 
 if df is not None:
-    # --- 側邊欄 ---
     with st.sidebar:
-        st.title("🎛️ 戰情室中控台")
-        st.image("https://cdn-icons-png.flaticon.com/512/3094/3094851.png", width=50) 
-        st.write(f"📊 總資料筆數: {len(df):,}")
+        st.markdown("<h2 style='text-align: center; color: #2C3E50;'>🎛️ 戰情室中控台</h2>", unsafe_allow_html=True)
+        st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
         
         analysis_mode = st.radio("請選擇視角：", [
             "🏆 營運總覽 Dashboard", 
@@ -240,10 +213,10 @@ if df is not None:
             "🎯 精準系列分析 (查產品)", 
             "🕵️‍♀️ 業務績效深鑽 (查人)", 
             "💰 毛利與淨利精算 (查錢)"
-        ])
+        ], label_visibility="collapsed")
         
         st.markdown("---")
-        st.header("📅 日期時間軸")
+        st.markdown("### 📅 日期時間軸")
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
@@ -254,19 +227,23 @@ if df is not None:
         elif date_preset == "近 3 年": start_d, end_d = max_date - pd.Timedelta(days=365*3), max_date
         else: start_d, end_d = min_date, max_date
         
-        date_range = st.date_input("🗓️ 自訂精確範圍", [start_d, end_d], min_value=min_date, max_value=max_date)
+        st.markdown("🗓️ **自訂精確範圍**")
+        selected_start = st.date_input("🟢 起算日", value=start_d, min_value=min_date, max_value=max_date)
+        selected_end = st.date_input("🔴 結尾日", value=end_d, min_value=min_date, max_value=max_date)
+        
+        if selected_start > selected_end: 
+            st.error("⚠️ 起算日不能晚於結尾日喔！")
 
     v_df = df.copy()
-    if len(date_range) == 2:
-        v_df = v_df[(v_df['OUTDATE'].dt.date >= date_range[0]) & (v_df['OUTDATE'].dt.date <= date_range[1])]
+    if selected_start <= selected_end:
+        v_df = v_df[(v_df['OUTDATE'].dt.date >= selected_start) & (v_df['OUTDATE'].dt.date <= selected_end)]
 
-    # 頂部標題
     col_t, col_p = st.columns([8,1])
     with col_t: 
         st.markdown(f"## {analysis_mode}")
-        st.caption(f"數據範圍：{date_range[0]} 至 {date_range[1]}")
+        st.caption(f"🗓️ 數據範圍：**{selected_start}** 至 **{selected_end}**")
     with col_p: 
-        components.html("""<button class="print-btn" onclick="window.print()" style="background:#2C3E50;color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-weight:bold;">🖨️ 列印報表</button>""", height=60)
+        components.html("""<button class="print-btn" onclick="window.print()" style="background:#2C3E50;color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-weight:bold;width:100%;">🖨️ 列印</button>""", height=60)
 
     # ==========================================
     # 🏆 營運總覽 Dashboard
@@ -280,7 +257,7 @@ if df is not None:
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}", delta="交易熱度")
         st.markdown("---")
         
-        days_diff = (date_range[1] - date_range[0]).days if len(date_range) == 2 else 0
+        days_diff = (selected_end - selected_start).days if selected_start <= selected_end else 0
         if days_diff > 365:
             v_df['年月'] = v_df['OUTDATE'].dt.strftime('%Y-%m')
             fig_trend = px.bar(v_df.groupby('年月')['金額'].sum().reset_index(), x='年月', y='金額', title="📈 月營收趨勢 (長期)", color_discrete_sequence=['#F39C12'])
@@ -292,19 +269,19 @@ if df is not None:
         
         c_L, c_R = st.columns(2)
         with c_L:
-            st.subheader("👑 業務戰神榜")
+            st.markdown("#### 👑 業務戰神榜")
             sr = v_df.groupby('業務員')['金額'].sum().reset_index().sort_values('金額', ascending=False).head(10)
             fig = px.bar(sr, x='金額', y='業務員', orientation='h', text_auto='.2s', color='金額', color_continuous_scale='Blues')
             fig.update_layout(yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig, use_container_width=True)
         with c_R:
-            st.subheader("🏪 店家貢獻榜")
+            st.markdown("#### 🏪 店家貢獻榜")
             cr = v_df.groupby('店家名稱')['金額'].sum().reset_index().sort_values('金額', ascending=False).head(10)
             fig = px.bar(cr, x='金額', y='店家名稱', orientation='h', text_auto='.2s', color='金額', color_continuous_scale='Oranges')
             fig.update_layout(yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig, use_container_width=True)
         
-        st.subheader("🔥 熱銷產品 Top 15")
+        st.markdown("#### 🔥 熱銷產品 Top 15")
         pr = v_df.groupby('產品全名')[['金額', '數量']].sum().reset_index().sort_values('金額', ascending=False).head(15)
         fig_p = px.bar(pr, x='金額', y='產品全名', orientation='h', text_auto='.2s', color='金額', color_continuous_scale='Greens')
         fig_p.update_layout(yaxis=dict(autorange="reversed"), height=600)
@@ -369,7 +346,7 @@ if df is not None:
                     st.plotly_chart(fig2, use_container_width=True)
 
     # ==========================================
-    # 3. 業務績效深鑽
+    # 3. 業務績效深鑽 (加入店家直接點擊查看產品功能)
     # ==========================================
     elif "業務績效" in analysis_mode:
         sales_list = sorted(v_df['業務員'].astype(str).unique())
@@ -379,6 +356,7 @@ if df is not None:
             if search_sales: sales_list = [s for s in sales_list if search_sales in s]
         with c_sel:
             selected_sales = st.selectbox("選擇業務員", ["--- 請選擇 ---"] + sales_list)
+        
         if selected_sales != "--- 請選擇 ---":
             s_df = v_df[v_df['業務員'] == selected_sales]
             st.markdown(f"### 👤 {selected_sales} 個人戰情板")
@@ -388,6 +366,7 @@ if df is not None:
             k3.metric("🏪 成交家數", f"{s_df['店家名稱'].nunique()}")
             k4.metric("🛍️ 產品款數", f"{s_df['產品全名'].nunique()}")
             st.markdown("---")
+            
             col_cust, col_prod = st.columns(2)
             with col_cust:
                 st.markdown("#### 🏪 他的主力客戶")
@@ -402,6 +381,33 @@ if df is not None:
                 fig_p.update_layout(yaxis=dict(autorange="reversed"))
                 st.plotly_chart(fig_p, use_container_width=True)
 
+            # 🌟 新增功能：客戶深度查帳 (直接看賣了什麼給特定店家)
+            st.markdown("---")
+            st.markdown(f"#### 🔍 {selected_sales} 的客戶深度查帳 (看他賣了什麼給店家)")
+            st.info("💡 在下方選擇他負責的店家，系統會立刻列出他賣給這家店的所有產品統計與歷史明細！")
+            
+            cust_opts = s_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).index.tolist()
+            if cust_opts:
+                selected_s_cust = st.selectbox("請選擇要深入查看的店家：", ["--- 請選擇 ---"] + cust_opts)
+                
+                if selected_s_cust != "--- 請選擇 ---":
+                    detail_df = s_df[s_df['店家名稱'] == selected_s_cust]
+                    
+                    st.success(f"✅ 目前顯示：**{selected_sales}** 賣給 **{selected_s_cust}** 的所有資料")
+                    
+                    # 使用雙頁籤，一邊看產品總數，一邊看單次進貨紀錄
+                    t_prod, t_detail = st.tabs(["📦 賣了哪些產品 (區間總計)", "🧾 單筆歷史進貨紀錄"])
+                    
+                    with t_prod:
+                        prod_summary = detail_df.groupby('產品全名')[['數量', '金額']].sum().reset_index().sort_values('金額', ascending=False)
+                        st.dataframe(prod_summary, use_container_width=True, hide_index=True)
+                        
+                    with t_detail:
+                        show_cols = ['日期_CN', 'SOURNO', '產品全名', '數量', '金額']
+                        st.dataframe(detail_df[show_cols].sort_values('日期_CN', ascending=False), use_container_width=True, hide_index=True)
+            else:
+                st.warning("該業務在此區間內尚未有成交紀錄。")
+
     # ==========================================
     # 4. 毛利與淨利精算
     # ==========================================
@@ -414,7 +420,7 @@ if df is not None:
         
         st.markdown("### 💰 獲利結構精算表")
         if total_product_cost == 0:
-            st.warning("⚠️ 成本資料為 0！請確認 GitHub 上是否有上傳 `STOCK.DBF` (或 `股票代號 : DBF`)。")
+            st.warning("⚠️ 成本資料為 0！請確認 GitHub 上是否有上傳 `STOCK.DBF`。")
             
         col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("1️⃣ 總營收 (Revenue)", f"${total_rev:,.0f}", delta="收入來源")
