@@ -4,11 +4,6 @@ import plotly.express as px
 import os
 import re
 import zipfile
-import google.generativeai as genai 
-
-# --- 🌟 設定 Gemini API Key ---
-GOOGLE_API_KEY = "AIzaSyAf_rmswAbDS87YxTAwjICVg3SPdlYZ16o" 
-genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="峰揚行動查價系統", page_icon="📱", layout="wide")
@@ -186,7 +181,7 @@ if df is not None:
         st.markdown("<h2 style='text-align: center; color: #2C3E50;'>📱 行動查價站</h2>", unsafe_allow_html=True)
         st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
         
-        # 🌟 極簡選單 (拔除密碼與成本)
+        # 🌟 極簡選單
         menu_options = [
             "🏆 營運總覽 Dashboard", 
             "🔎 店家查帳 (單一店家查價)", 
@@ -235,65 +230,6 @@ if df is not None:
         c3, c4 = st.columns(2)
         c3.metric("🏪 成交店數", f"{v_df['店家名稱'].nunique()}")
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
-        
-        st.markdown("---")
-        
-        st.markdown("### 💬 AI 助理 (快速查資料)")
-        if "chat_messages" not in st.session_state:
-            st.session_state.chat_messages = [{"role": "assistant", "content": "大哥好！有想找什麼店家或產品的資訊，直接輸入問我！"}]
-        
-        for msg in st.session_state.chat_messages:
-            st.chat_message(msg["role"]).write(msg["content"])
-            
-        if prompt_q := st.chat_input("請輸入您的問題..."):
-            st.session_state.chat_messages.append({"role": "user", "content": prompt_q})
-            st.chat_message("user").write(prompt_q)
-            
-            with st.chat_message("assistant"):
-                with st.spinner("🤖 AI 掃描中..."):
-                    try:
-                        eng_num = re.findall(r'[A-Za-z0-9]+', prompt_q)
-                        c_text = re.sub(r'[^\u4e00-\u9fa5]', '', prompt_q)
-                        ngrams = [c_text[i:i+n] for n in [2, 3, 4] for i in range(len(c_text)-n+1)]
-                        stop_words = {"什麼","請問","最熱","熱銷","品項","是哪","一個","多少","幫我","查詢","哪些","是有","這個","目前","領先","開頭","編號","我是","有哪","怎麼","第一","賣最","好的","產品","誰","和","與","的","了","可以","告訴","知道","數據","資料"}
-                        search_terms = list(set([k for k in (eng_num + ngrams) if k not in stop_words]))
-                        
-                        matched_df = pd.DataFrame()
-                        if search_terms:
-                            mask = pd.Series(False, index=v_df.index)
-                            for kw in search_terms:
-                                mask = mask | v_df['產品全名'].str.contains(kw, case=False, na=False)
-                                mask = mask | v_df['店家名稱'].astype(str).str.contains(kw, case=False, na=False)
-                                mask = mask | v_df['業務員'].astype(str).str.contains(kw, case=False, na=False)
-                            matched_df = v_df[mask]
-                        
-                        dynamic_context = ""
-                        if not matched_df.empty:
-                            top_prod = matched_df.groupby('產品全名')['數量'].sum().sort_values(ascending=False).head(10).to_dict()
-                            top_cust = matched_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).head(5).to_dict()
-                            dynamic_context = f"\n【🔍 動態比對結果】：\n- 產品總銷量：{top_prod}\n- 店家總營收：{top_cust}\n"
-                        else:
-                            dynamic_context = "\n【🔍 動態比對結果】：查無資料。\n"
-
-                        base_context = f"""
-                        你是老闆專屬的銷售 AI 助理。回答請簡潔有力，適合在手機上閱讀。
-                        如果找不到數據，請引導他去左側選單的【店家查帳】或【報價照妖鏡】尋找。
-                        
-                        【大盤數據 ({selected_start} 到 {selected_end})】
-                        - 總營收：{v_df['金額'].sum():,.0f} 元
-                        - 業務營收表現：{v_df.groupby('業務員')['金額'].sum().sort_values(ascending=False).to_dict()}
-                        - 熱銷前十名：{v_df.groupby('產品全名')['數量'].sum().sort_values(ascending=False).head(10).to_dict()}
-                        {dynamic_context}
-                        """
-                        
-                        context_data = base_context + f"\n老闆問題：{prompt_q}"
-                        model = genai.GenerativeModel('gemini-2.5-flash')
-                        ai_reply = model.generate_content(context_data)
-                        
-                        st.write(ai_reply.text)
-                        st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply.text})
-                    except Exception as e:
-                        st.error(f"⚠️ 連線錯誤：{e}")
 
     # ==========================================
     # 1. 店家查帳 / 我的客戶查帳 (極簡查價版)
