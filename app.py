@@ -4,6 +4,11 @@ import plotly.express as px
 import os
 import re
 import zipfile
+import google.generativeai as genai 
+
+# --- 🌟 設定 Gemini API Key ---
+GOOGLE_API_KEY = "AIzaSyAf_rmswAbDS87YxTAwjICVg3SPdlYZ16o" 
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="峰揚行動查價系統", page_icon="📱", layout="wide")
@@ -58,7 +63,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版，拔除成本運算) ---
+# --- 🔥 數據載入引擎 (輕量化版) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -198,12 +203,37 @@ if df is not None:
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
-        date_preset = st.selectbox("⏳ 快速跳轉", ["最近 30 天", "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"])
-        if date_preset == "最近 30 天": start_d, end_d = max_date - pd.Timedelta(days=30), max_date
-        elif date_preset == "今年以來 (YTD)": start_d, end_d = pd.Timestamp(f"{max_date.year}-01-01").date(), max_date
-        elif date_preset == "去年全年度": start_d, end_d = pd.Timestamp(f"{max_date.year-1}-01-01").date(), pd.Timestamp(f"{max_date.year-1}-12-31").date()
-        elif date_preset == "近 3 年": start_d, end_d = max_date - pd.Timedelta(days=365*3), max_date
-        else: start_d, end_d = min_date, max_date
+        # 🚀 升級版：極致絲滑的快速時間選項
+        date_preset = st.selectbox("⏳ 快速跳轉", [
+            "最近 7 天", "最近 30 天", "本月", "上個月", 
+            "最近 3 個月", "最近 6 個月", "最近 9 個月", 
+            "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"
+        ])
+        
+        if date_preset == "最近 7 天": 
+            start_d, end_d = max_date - pd.Timedelta(days=7), max_date
+        elif date_preset == "最近 30 天": 
+            start_d, end_d = max_date - pd.Timedelta(days=30), max_date
+        elif date_preset == "本月": 
+            start_d, end_d = max_date.replace(day=1), max_date
+        elif date_preset == "上個月": 
+            first_day_this_month = max_date.replace(day=1)
+            end_d = first_day_this_month - pd.Timedelta(days=1)
+            start_d = end_d.replace(day=1)
+        elif date_preset == "最近 3 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=3)).date(), max_date
+        elif date_preset == "最近 6 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=6)).date(), max_date
+        elif date_preset == "最近 9 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=9)).date(), max_date
+        elif date_preset == "今年以來 (YTD)": 
+            start_d, end_d = pd.Timestamp(f"{max_date.year}-01-01").date(), max_date
+        elif date_preset == "去年全年度": 
+            start_d, end_d = pd.Timestamp(f"{max_date.year-1}-01-01").date(), pd.Timestamp(f"{max_date.year-1}-12-31").date()
+        elif date_preset == "近 3 年": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(years=3)).date(), max_date
+        else: 
+            start_d, end_d = min_date, max_date
         
         selected_start = st.date_input("🟢 起", value=start_d, min_value=min_date, max_value=max_date)
         selected_end = st.date_input("🔴 迄", value=end_d, min_value=min_date, max_value=max_date)
