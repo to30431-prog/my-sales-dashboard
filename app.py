@@ -4,11 +4,6 @@ import plotly.express as px
 import os
 import re
 import zipfile
-import google.generativeai as genai 
-
-# --- 🌟 設定 Gemini API Key ---
-GOOGLE_API_KEY = "AIzaSyAf_rmswAbDS87YxTAwjICVg3SPdlYZ16o" 
-genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="峰揚行動查價系統", page_icon="📱", layout="wide")
