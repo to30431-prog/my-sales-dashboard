@@ -58,7 +58,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版 + 終極天羅地網名片掃描) ---
+# --- 🔥 數據載入引擎 (輕量化版 + 雙重鑰匙名片對接) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -156,7 +156,6 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                # 🌟 天羅地網清單：把 X光片看到的排前面，其他備用的排後面
                 tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL', 'TEL', 'TEL_NO', 'PHONE', 'COMP_TEL']
                 addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR', 'ADDR', 'ADDR1', 'ADDRESS', 'C_ADDR', 'ADD']
                 
@@ -165,29 +164,33 @@ def load_data_final():
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
-                    # 🌟 殺死全形空白與一般空白，保證名字絕對乾淨
                     c_df['clean_name'] = c_df[c_na_col].astype(str).str.replace("　", "").str.strip()
                     cust_map = c_df.set_index('clean_key')['clean_name'].to_dict()
                     
                     for _, row in c_df.iterrows():
+                        c_key = str(row['clean_key'])
                         c_name = str(row['clean_name'])
-                        if not c_name or c_name == "nan": continue
                         
                         c_tel = "系統無紀錄"
                         for t_col in tel_cols:
-                            val = str(row[t_col]).strip()
+                            val = str(row[t_col]).replace("　", "").strip()
                             if val and val not in ["nan", "None", "NaN", ""]:
                                 c_tel = val
                                 break
                                 
                         c_addr = "系統無紀錄"
                         for a_col in addr_cols:
-                            val = str(row[a_col]).strip()
+                            val = str(row[a_col]).replace("　", "").strip()
                             if val and val not in ["nan", "None", "NaN", ""]:
                                 c_addr = val
                                 break
                             
-                        cust_info_map[c_name] = {"電話": c_tel, "地址": c_addr}
+                        info_dict = {"電話": c_tel, "地址": c_addr}
+                        
+                        # 💡 終極解法：雙重鑰匙！代號跟名字都當作鑰匙存進去！
+                        cust_info_map[c_key] = info_dict
+                        if c_name:
+                            cust_info_map[c_name] = info_dict
             except: pass
 
         df['業務員'] = df['SALES_KEY'].map(name_map).fillna(df['SALES_KEY'])
@@ -195,7 +198,7 @@ def load_data_final():
         if mask_sales_fail.any():
              df.loc[mask_sales_fail, '業務員'] = df.loc[mask_sales_fail, 'SALES_KEY'].str.zfill(4).map(name_map).fillna(df.loc[mask_sales_fail, 'SALES_KEY'])
         
-        # 🌟 銷售大表的店家名字也必須同步絞碎全形空白，確保完美對接
+        # 同步過濾全形空白
         df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY']).astype(str).str.replace("　", "").str.strip()
         
         return df, cust_info_map
@@ -217,7 +220,6 @@ if df is not None:
         st.markdown("<h2 style='text-align: center; color: #2C3E50;'>📱 行動查價站</h2>", unsafe_allow_html=True)
         st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
         
-        # 🌟 極簡選單
         menu_options = [
             "🏆 營運總覽 Dashboard", 
             "🔎 店家查帳 (單一店家查價)", 
@@ -234,7 +236,6 @@ if df is not None:
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
-        # 🚀 升級版：極致絲滑的快速時間選項
         date_preset = st.selectbox("⏳ 快速跳轉", [
             "最近 7 天", "最近 30 天", "本月", "上個月", 
             "最近 3 個月", "最近 6 個月", "最近 9 個月", 
@@ -311,19 +312,24 @@ if df is not None:
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
             
-            # 🌟 新增：店家專屬名片卡片 (隱形空白已清除，100%命中)
-            info = cust_info_map.get(sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
+            sub = df[df['店家名稱'] == sel] 
+            
+            # 💡 雙重開鎖：先拿「代號」去開，打不開再拿「店家名稱」去硬開！
+            target_cust_key = sub['CUST_KEY'].iloc[0] if not sub.empty else ""
+            
+            info = cust_info_map.get(target_cust_key)
+            if not info:
+                info = cust_info_map.get(sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
+            
             st.markdown(f"""
             <div style='background-color:#EBF5FB; padding:15px 20px; border-radius:12px; border-left:6px solid #1ABC9C; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
-                <h4 style='color:#0E6655; margin-top:0; font-weight:800;'>{sel}</h4>
+                <h4 style='color:#0E6655; margin-top:0; font-weight:800;'>{sel} <span style='font-size:0.5em; color:#AAB7B8; font-weight:normal;'>(代號: {target_cust_key})</span></h4>
                 <div style='color:#117A65; font-size:16px; line-height:1.6;'>
                     <b>📞 電話：</b> {info['電話']} <br>
                     <b>📍 地址：</b> {info['地址']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
-            sub = df[df['店家名稱'] == sel] 
             
             tab_history, tab_1yr_summary = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單"])
             
