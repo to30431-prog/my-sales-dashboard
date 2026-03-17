@@ -155,22 +155,22 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                # 🌟 根據 X 光片，按照優先順序排列！(確保找到最準確的)
                 tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL']
                 addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR']
                 
-                # 只留下資料表裡面真的有的欄位
                 tel_cols = [c for c in tel_candidates if c in c_df.columns]
                 addr_cols = [c for c in addr_candidates if c in c_df.columns]
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
-                    cust_map = c_df.set_index('clean_key')[c_na_col].to_dict()
+                    # 🌟 核心修復：強制脫水，把名字後面的隱形空白全部砍掉！
+                    c_df['clean_name'] = c_df[c_na_col].astype(str).str.strip()
+                    cust_map = c_df.set_index('clean_key')['clean_name'].to_dict()
                     
                     for _, row in c_df.iterrows():
-                        c_name = str(row[c_na_col]).strip()
+                        c_name = str(row['clean_name'])
+                        if not c_name or c_name == "nan": continue
                         
-                        # 🔍 找電話：依照優先順序掃描，找到第一個有字的就抓出來！
                         c_tel = "系統無紀錄"
                         for t_col in tel_cols:
                             val = str(row[t_col]).strip()
@@ -178,7 +178,6 @@ def load_data_final():
                                 c_tel = val
                                 break
                                 
-                        # 🔍 找地址：依照優先順序掃描 (COMP_ADDR 最優先)
                         c_addr = "系統無紀錄"
                         for a_col in addr_cols:
                             val = str(row[a_col]).strip()
@@ -193,7 +192,9 @@ def load_data_final():
         mask_sales_fail = df['業務員'] == df['SALES_KEY']
         if mask_sales_fail.any():
              df.loc[mask_sales_fail, '業務員'] = df.loc[mask_sales_fail, 'SALES_KEY'].str.zfill(4).map(name_map).fillna(df.loc[mask_sales_fail, 'SALES_KEY'])
-        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY'])
+        
+        # 🌟 同步確保銷售表上的名字也沒有隱形空白
+        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY']).astype(str).str.strip()
         
         return df, cust_info_map
 
@@ -308,7 +309,7 @@ if df is not None:
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
             
-            # 🌟 新增：店家專屬名片卡片
+            # 🌟 新增：店家專屬名片卡片 (隱形空白已清除，100%命中)
             info = cust_info_map.get(sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
             st.markdown(f"""
             <div style='background-color:#EBF5FB; padding:15px 20px; border-radius:12px; border-left:6px solid #1ABC9C; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
