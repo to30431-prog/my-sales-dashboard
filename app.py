@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
@@ -58,7 +58,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版) ---
+# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -145,6 +145,7 @@ def load_data_final():
             except: pass
 
         cust_map = {}
+        cust_info_map = {} # 🌟 店家詳細資訊字典
         cust_path = find_file_recursive(['CUST.DBF', 'cust.dbf', '客戶.DBF'])
         if cust_path:
             try:
@@ -153,9 +154,39 @@ def load_data_final():
                 c_df = pd.DataFrame(iter(c_table))
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
+                
+                # 🌟 根據 X 光片，按照優先順序排列！(確保找到最準確的)
+                tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL']
+                addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR']
+                
+                # 只留下資料表裡面真的有的欄位
+                tel_cols = [c for c in tel_candidates if c in c_df.columns]
+                addr_cols = [c for c in addr_candidates if c in c_df.columns]
+                
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
                     cust_map = c_df.set_index('clean_key')[c_na_col].to_dict()
+                    
+                    for _, row in c_df.iterrows():
+                        c_name = str(row[c_na_col]).strip()
+                        
+                        # 🔍 找電話：依照優先順序掃描，找到第一個有字的就抓出來！
+                        c_tel = "系統無紀錄"
+                        for t_col in tel_cols:
+                            val = str(row[t_col]).strip()
+                            if val and val not in ["nan", "None", "NaN", ""]:
+                                c_tel = val
+                                break
+                                
+                        # 🔍 找地址：依照優先順序掃描 (COMP_ADDR 最優先)
+                        c_addr = "系統無紀錄"
+                        for a_col in addr_cols:
+                            val = str(row[a_col]).strip()
+                            if val and val not in ["nan", "None", "NaN", ""]:
+                                c_addr = val
+                                break
+                            
+                        cust_info_map[c_name] = {"電話": c_tel, "地址": c_addr}
             except: pass
 
         df['業務員'] = df['SALES_KEY'].map(name_map).fillna(df['SALES_KEY'])
@@ -164,17 +195,19 @@ def load_data_final():
              df.loc[mask_sales_fail, '業務員'] = df.loc[mask_sales_fail, 'SALES_KEY'].str.zfill(4).map(name_map).fillna(df.loc[mask_sales_fail, 'SALES_KEY'])
         df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY'])
         
-        return df
+        return df, cust_info_map
 
     except Exception as e:
         return None, str(e)
 
+# --- 啟動解析 ---
 result = load_data_final()
 if isinstance(result, tuple) and result[0] is None: 
     st.error(f"⚠️ 系統錯誤: {result[1]}")
     st.stop()
 else:
-    df = result if not isinstance(result, tuple) else result[0]
+    df = result[0].copy()
+    cust_info_map = result[1] if len(result) > 1 else {}
 
 if df is not None:
     with st.sidebar:
@@ -257,7 +290,7 @@ if df is not None:
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
 
     # ==========================================
-    # 1. 店家查帳 / 我的客戶查帳 (極簡查價版)
+    # 1. 店家查帳 / 我的客戶查帳 (極簡查價版 + 名片)
     # ==========================================
     elif "店家查帳" in analysis_mode:
         kw = st.sidebar.text_input("🔍 搜尋店家名稱", "")
@@ -274,6 +307,19 @@ if df is not None:
             
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
+            
+            # 🌟 新增：店家專屬名片卡片
+            info = cust_info_map.get(sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
+            st.markdown(f"""
+            <div style='background-color:#EBF5FB; padding:15px 20px; border-radius:12px; border-left:6px solid #1ABC9C; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
+                <h4 style='color:#0E6655; margin-top:0; font-weight:800;'>{sel}</h4>
+                <div style='color:#117A65; font-size:16px; line-height:1.6;'>
+                    <b>📞 電話：</b> {info['電話']} <br>
+                    <b>📍 地址：</b> {info['地址']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
             sub = df[df['店家名稱'] == sel] 
             
             tab_history, tab_1yr_summary = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單"])
