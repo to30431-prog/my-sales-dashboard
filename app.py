@@ -58,8 +58,9 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描 + 解碼破譯版) ---
-@st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
+# --- 🔥 數據載入引擎 (極致記憶體優化版) ---
+# 加入 max_entries=1，強制伺服器只保留一份最新資料，防止記憶體塞爆
+@st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...", max_entries=1)
 def load_data_final():
     try:
         zip_path = find_file_recursive(['All_Sales_5Years.zip', 'All_Sales_5years.zip', 'all_sales_5years.zip'])
@@ -155,18 +156,16 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                # 🌟 X光片破譯版：直接將真實代號 TELE1, CARADD, INVOADD 設為最高優先級！
                 tel_cols = [c for c in c_df.columns if c.upper() in ['TELE1', 'TELE2', 'TEL1', 'TEL2', 'COMP_TEL', 'CON_TEL', 'TEL']]
                 addr_cols = [c for c in c_df.columns if c.upper() in ['CARADD', 'INVOADD', 'SEND_ADDR', 'INVOICE_AD', 'C_ADDR1', 'C_ADDR']]
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
-                    # 🔥 暴力除垢：把資料庫裡名字後面的隱形空白全部刪除
                     c_df['clean_name'] = c_df[c_na_col].astype(str).str.strip()
                     cust_map = c_df.set_index('clean_key')['clean_name'].to_dict()
                     
                     for _, row in c_df.iterrows():
-                        c_name = str(row['clean_name']) # 確保這裡的名字也是乾淨無空白的
+                        c_name = str(row['clean_name']) 
                         if c_name in ["nan", "None", "NaN", ""]: continue
                         
                         c_tel = "系統無紀錄"
@@ -203,7 +202,7 @@ if isinstance(result, tuple) and result[0] is None:
     st.error(f"⚠️ 系統錯誤: {result[1]}")
     st.stop()
 else:
-    df = result[0].copy()
+    df = result[0]
     cust_info_map = result[1] if len(result) > 1 else {}
 
 if df is not None:
@@ -228,7 +227,6 @@ if df is not None:
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
-        # 🚀 升級版：極致絲滑的快速時間選項
         date_preset = st.selectbox("⏳ 快速跳轉", [
             "最近 7 天", "最近 30 天", "本月", "上個月", 
             "最近 3 個月", "最近 6 個月", "最近 9 個月", 
@@ -266,9 +264,9 @@ if df is not None:
         if selected_start > selected_end: 
             st.error("⚠️ 起算日不能晚於結尾日喔！")
 
-    v_df = df.copy()
-    if selected_start <= selected_end:
-        v_df = v_df[(v_df['OUTDATE'].dt.date >= selected_start) & (v_df['OUTDATE'].dt.date <= selected_end)]
+    # 🔥 防當機核心：絕不複製資料，只用時間範圍做「切片 (Slice)」
+    time_mask = (df['OUTDATE'].dt.date >= selected_start) & (df['OUTDATE'].dt.date <= selected_end)
+    v_df = df[time_mask]
 
     st.markdown(f"## {analysis_mode}")
     if "全店家總表" not in analysis_mode and "報價照妖鏡" not in analysis_mode:
@@ -287,25 +285,34 @@ if df is not None:
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
 
     # ==========================================
-    # 1. 店家查帳 / 我的客戶查帳 (極簡查價版 + 名片)
+    # 1. 店家查帳 (不複製資料，安全又快)
     # ==========================================
     elif "店家查帳" in analysis_mode:
-        kw = st.sidebar.text_input("🔍 搜尋店家名稱", "")
-        if kw: v_df = v_df[v_df['店家名稱'].str.contains(kw, na=False)]
+        col_s1, col_s2 = st.columns([1, 1])
         
-        cust_group = v_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).reset_index()
-        if cust_group.empty:
-            st.warning("⚠️ 該區間內無交易紀錄！")
-            sel = "--"
+        with col_s1:
+            kw = st.text_input("🔍 1. 搜尋店家名稱 (可輸入關鍵字)", "")
+            
+        # 安全切片過濾
+        if kw: 
+            filter_df = v_df[v_df['店家名稱'].str.contains(kw, na=False)]
         else:
-            cust_group['Label'] = cust_group.apply(lambda x: f"{x['店家名稱']} (${x['金額']:,.0f})", axis=1)
-            sel_label = st.selectbox("請選擇店家", ["--- 請選擇 ---"] + cust_group['Label'].tolist())
-            sel = sel_label.split(' ($')[0] if sel_label != "--- 請選擇 ---" else "--"
+            filter_df = v_df
+            
+        cust_group = filter_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).reset_index()
+        
+        with col_s2:
+            if cust_group.empty:
+                st.warning("⚠️ 該區間內無交易紀錄！")
+                sel = "--"
+            else:
+                cust_group['Label'] = cust_group.apply(lambda x: f"{x['店家名稱']} (${x['金額']:,.0f})", axis=1)
+                sel_label = st.selectbox("🎯 2. 請選擇要查帳的店家", ["--- 請選擇 ---"] + cust_group['Label'].tolist())
+                sel = sel_label.split(' ($')[0] if sel_label != "--- 請選擇 ---" else "--"
             
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
             
-            # 🌟 新增：店家專屬名片卡片 (確保 key 是去空白的乾淨版)
             clean_sel = sel.strip()
             info = cust_info_map.get(clean_sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
             
@@ -324,7 +331,7 @@ if df is not None:
             tab_history, tab_1yr_summary = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單"])
             
             with tab_history:
-                sub_time_filtered = v_df[v_df['店家名稱'] == sel]
+                sub_time_filtered = filter_df[filter_df['店家名稱'] == sel]
                 og = sub_time_filtered.groupby(['日期_CN', 'SOURNO'])['金額'].sum().reset_index().sort_values('日期_CN', ascending=False)
                 og['L'] = og.apply(lambda x: f"{x['日期_CN']} (單號:{x['SOURNO']} / 金額: ${x['金額']:,.0f})", axis=1)
                 
@@ -367,7 +374,7 @@ if df is not None:
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
 
     # ==========================================
-    # 2. 全店家一年進貨總表 (全台查價)
+    # 2. 全店家一年進貨總表 (防當機煞車版)
     # ==========================================
     elif "全店家總表" in analysis_mode:
         st.info("💡 選擇特定業務與店家，系統自動還原近一年的最新拿貨底價。")
@@ -415,7 +422,12 @@ if df is not None:
                 agg_df = agg_df[['業務員', '店家名稱', '產品全名', '數量', '參考單價', '金額']]
                 agg_df['金額'] = agg_df['金額'].round(0)
                 
-                st.dataframe(agg_df, use_container_width=True, hide_index=True, height=600)
+                # 🔥 防當機安全煞車！
+                if len(agg_df) > 800:
+                    st.warning(f"⚠️ 報表過於龐大 (共 {len(agg_df)} 筆)！為防止手機當機，目前僅顯示前 800 筆。請在上方選擇【業務】或【店家】來縮小範圍！")
+                    st.dataframe(agg_df.head(800), use_container_width=True, hide_index=True, height=600)
+                else:
+                    st.dataframe(agg_df, use_container_width=True, hide_index=True, height=600)
 
     # ==========================================
     # 3. 系列分析
@@ -478,7 +490,7 @@ if df is not None:
                 st.warning("該區間內無成交紀錄。")
 
     # ==========================================
-    # 🌟 5. 業務報價照妖鏡 (精準攤薄算法)
+    # 🌟 5. 業務報價照妖鏡 (防當機煞車版)
     # ==========================================
     elif "報價照妖鏡" in analysis_mode:
         st.info("💡 系統已自動將「0元搭贈」合併計算真實底價，並排除退貨。一眼看穿誰賣最便宜！")
@@ -516,4 +528,9 @@ if df is not None:
             if only_diff:
                 compare_df = compare_df[compare_df['價差'] > 0]
 
-            st.dataframe(compare_df, use_container_width=True, hide_index=True, height=600)
+            # 🔥 防當機安全煞車！
+            if len(compare_df) > 800:
+                st.warning(f"⚠️ 偵測到 {len(compare_df)} 筆價差紀錄！為維持手機順暢，僅顯示前 800 筆，請善用上方搜尋框尋找特定產品。")
+                st.dataframe(compare_df.head(800), use_container_width=True, hide_index=True, height=600)
+            else:
+                st.dataframe(compare_df, use_container_width=True, hide_index=True, height=600)
