@@ -58,7 +58,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描) ---
+# --- 🔥 數據載入引擎 (輕量化版 + 終極天羅地網名片掃描) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -126,6 +126,7 @@ def load_data_final():
             s = str(x).strip()
             if s.endswith('.0'): s = s[:-2]
             return s
+            
         df['CUST_KEY'] = df['CUST_NO'].apply(super_clean)
         df['SALES_KEY'] = df['SUBNO'].apply(super_clean)
         
@@ -145,7 +146,7 @@ def load_data_final():
             except: pass
 
         cust_map = {}
-        cust_info_map = {} # 🌟 店家詳細資訊字典
+        cust_info_map = {} 
         cust_path = find_file_recursive(['CUST.DBF', 'cust.dbf', '客戶.DBF'])
         if cust_path:
             try:
@@ -155,16 +156,17 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL']
-                addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR']
+                # 🌟 天羅地網清單：把 X光片看到的排前面，其他備用的排後面
+                tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL', 'TEL', 'TEL_NO', 'PHONE', 'COMP_TEL']
+                addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR', 'ADDR', 'ADDR1', 'ADDRESS', 'C_ADDR', 'ADD']
                 
                 tel_cols = [c for c in tel_candidates if c in c_df.columns]
                 addr_cols = [c for c in addr_candidates if c in c_df.columns]
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
-                    # 🌟 核心修復：強制脫水，把名字後面的隱形空白全部砍掉！
-                    c_df['clean_name'] = c_df[c_na_col].astype(str).str.strip()
+                    # 🌟 殺死全形空白與一般空白，保證名字絕對乾淨
+                    c_df['clean_name'] = c_df[c_na_col].astype(str).str.replace("　", "").str.strip()
                     cust_map = c_df.set_index('clean_key')['clean_name'].to_dict()
                     
                     for _, row in c_df.iterrows():
@@ -193,8 +195,8 @@ def load_data_final():
         if mask_sales_fail.any():
              df.loc[mask_sales_fail, '業務員'] = df.loc[mask_sales_fail, 'SALES_KEY'].str.zfill(4).map(name_map).fillna(df.loc[mask_sales_fail, 'SALES_KEY'])
         
-        # 🌟 同步確保銷售表上的名字也沒有隱形空白
-        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY']).astype(str).str.strip()
+        # 🌟 銷售大表的店家名字也必須同步絞碎全形空白，確保完美對接
+        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY']).astype(str).str.replace("　", "").str.strip()
         
         return df, cust_info_map
 
