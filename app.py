@@ -58,7 +58,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描 + 除垢版) ---
+# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描 + 解碼破譯版) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -155,9 +155,9 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                # 🌟 根據 X 光片，精準鎖定並擴大備用欄位
-                tel_cols = [c for c in c_df.columns if c.upper() in ['COMP_TEL', 'TEL1', 'TEL2', 'CON_TEL']]
-                addr_cols = [c for c in c_df.columns if c.upper() in ['SEND_ADDR', 'INVOICE_AD', 'C_ADDR1', 'C_ADDR', 'B_ADDR1']]
+                # 🌟 X光片破譯版：直接將真實代號 TELE1, CARADD, INVOADD 設為最高優先級！
+                tel_cols = [c for c in c_df.columns if c.upper() in ['TELE1', 'TELE2', 'TEL1', 'TEL2', 'COMP_TEL', 'CON_TEL', 'TEL']]
+                addr_cols = [c for c in c_df.columns if c.upper() in ['CARADD', 'INVOADD', 'SEND_ADDR', 'INVOICE_AD', 'C_ADDR1', 'C_ADDR']]
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
