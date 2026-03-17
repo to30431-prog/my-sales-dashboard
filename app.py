@@ -59,7 +59,6 @@ def find_file_recursive(target_names):
     return None
 
 # --- 🔥 數據載入引擎 (極致記憶體優化版) ---
-# 加入 max_entries=1，強制伺服器只保留一份最新資料，防止記憶體塞爆
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...", max_entries=1)
 def load_data_final():
     try:
@@ -210,14 +209,13 @@ if df is not None:
         st.markdown("<h2 style='text-align: center; color: #2C3E50;'>📱 行動查價站</h2>", unsafe_allow_html=True)
         st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
         
-        # 🌟 極簡選單
+        # 🌟 極簡選單 (已拔除吃效能的照妖鏡)
         menu_options = [
             "🏆 營運總覽 Dashboard", 
             "🔎 店家查帳 (單一店家查價)", 
             "📋 全店家總表 (全台查價)", 
             "🎯 系列產品分析", 
-            "🕵️‍♀️ 業務績效深鑽", 
-            "🚨 報價照妖鏡 (抓底價/天價)"
+            "🕵️‍♀️ 業務績效深鑽"
         ]
             
         analysis_mode = st.radio("請選擇工具：", menu_options, label_visibility="collapsed")
@@ -269,7 +267,7 @@ if df is not None:
     v_df = df[time_mask]
 
     st.markdown(f"## {analysis_mode}")
-    if "全店家總表" not in analysis_mode and "報價照妖鏡" not in analysis_mode:
+    if "全店家總表" not in analysis_mode:
         st.caption(f"🗓️ 數據範圍：**{selected_start}** 至 **{selected_end}**")
 
     # ==========================================
@@ -293,7 +291,6 @@ if df is not None:
         with col_s1:
             kw = st.text_input("🔍 1. 搜尋店家名稱 (可輸入關鍵字)", "")
             
-        # 安全切片過濾
         if kw: 
             filter_df = v_df[v_df['店家名稱'].str.contains(kw, na=False)]
         else:
@@ -488,49 +485,3 @@ if df is not None:
                         st.dataframe(detail_df[show_cols].sort_values('日期_CN', ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.warning("該區間內無成交紀錄。")
-
-    # ==========================================
-    # 🌟 5. 業務報價照妖鏡 (防當機煞車版)
-    # ==========================================
-    elif "報價照妖鏡" in analysis_mode:
-        st.info("💡 系統已自動將「0元搭贈」合併計算真實底價，並排除退貨。一眼看穿誰賣最便宜！")
-
-        agg_quotes = v_df.groupby(['產品全名', '業務員', '店家名稱'])[['金額', '數量']].sum().reset_index()
-        valid_quotes = agg_quotes[(agg_quotes['數量'] > 0) & (agg_quotes['金額'] > 0)].copy()
-
-        if valid_quotes.empty:
-            st.warning("⚠️ 該區間內無有效交易紀錄。")
-        else:
-            valid_quotes['真實單價'] = (valid_quotes['金額'] / valid_quotes['數量']).round(1)
-            sorted_quotes = valid_quotes.sort_values(['產品全名', '真實單價'], ascending=[True, True])
-
-            min_df = sorted_quotes.drop_duplicates('產品全名', keep='first').rename(
-                columns={'真實單價': '最低單價', '業務員': '最低價業務', '店家名稱': '最低價店家'}
-            )
-            max_df = sorted_quotes.drop_duplicates('產品全名', keep='last').rename(
-                columns={'真實單價': '最高單價', '業務員': '最高價業務', '店家名稱': '最高價店家'}
-            )
-
-            compare_df = pd.merge(
-                min_df[['產品全名', '最低單價', '最低價業務', '最低價店家']],
-                max_df[['產品全名', '最高單價', '最高價業務', '最高價店家']],
-                on='產品全名'
-            )
-
-            compare_df['價差'] = (compare_df['最高單價'] - compare_df['最低單價']).round(1)
-            compare_df = compare_df.sort_values('價差', ascending=False)
-
-            search_prod = st.text_input("🔍 搜尋特定產品：", "")
-            only_diff = st.checkbox("⚠️ 只顯示有「價差」的產品", value=True)
-
-            if search_prod:
-                compare_df = compare_df[compare_df['產品全名'].str.contains(search_prod, case=False, na=False)]
-            if only_diff:
-                compare_df = compare_df[compare_df['價差'] > 0]
-
-            # 🔥 防當機安全煞車！
-            if len(compare_df) > 800:
-                st.warning(f"⚠️ 偵測到 {len(compare_df)} 筆價差紀錄！為維持手機順暢，僅顯示前 800 筆，請善用上方搜尋框尋找特定產品。")
-                st.dataframe(compare_df.head(800), use_container_width=True, hide_index=True, height=600)
-            else:
-                st.dataframe(compare_df, use_container_width=True, hide_index=True, height=600)
