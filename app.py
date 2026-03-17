@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
@@ -58,7 +58,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (輕量化版 + 雙重鑰匙名片對接) ---
+# --- 🔥 數據載入引擎 (輕量化版 + 終極名片掃描 + 除垢版) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...")
 def load_data_final():
     try:
@@ -126,7 +126,6 @@ def load_data_final():
             s = str(x).strip()
             if s.endswith('.0'): s = s[:-2]
             return s
-            
         df['CUST_KEY'] = df['CUST_NO'].apply(super_clean)
         df['SALES_KEY'] = df['SUBNO'].apply(super_clean)
         
@@ -156,48 +155,42 @@ def load_data_final():
                 c_id_col = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'C_NO', 'K_NO', 'ID', 'CODE']), None)
                 c_na_col = next((c for c in c_df.columns if c.upper() in ['C_NA', 'NAME', 'C_NAME', 'COMPANY', 'CUST_NAME', 'TITLE']), None)
                 
-                tel_candidates = ['TEL1', 'TEL2', 'CON_TEL', 'C_TEL', 'TEL', 'TEL_NO', 'PHONE', 'COMP_TEL']
-                addr_candidates = ['COMP_ADDR', 'SEND_ADDR', 'INVO_ADDR', 'ADDR', 'ADDR1', 'ADDRESS', 'C_ADDR', 'ADD']
-                
-                tel_cols = [c for c in tel_candidates if c in c_df.columns]
-                addr_cols = [c for c in addr_candidates if c in c_df.columns]
+                # 🌟 根據 X 光片，精準鎖定並擴大備用欄位
+                tel_cols = [c for c in c_df.columns if c.upper() in ['COMP_TEL', 'TEL1', 'TEL2', 'CON_TEL']]
+                addr_cols = [c for c in c_df.columns if c.upper() in ['SEND_ADDR', 'INVOICE_AD', 'C_ADDR1', 'C_ADDR', 'B_ADDR1']]
                 
                 if c_id_col and c_na_col:
                     c_df['clean_key'] = c_df[c_id_col].apply(super_clean)
-                    c_df['clean_name'] = c_df[c_na_col].astype(str).str.replace("　", "").str.strip()
+                    # 🔥 暴力除垢：把資料庫裡名字後面的隱形空白全部刪除
+                    c_df['clean_name'] = c_df[c_na_col].astype(str).str.strip()
                     cust_map = c_df.set_index('clean_key')['clean_name'].to_dict()
                     
                     for _, row in c_df.iterrows():
-                        c_key = str(row['clean_key'])
-                        c_name = str(row['clean_name'])
+                        c_name = str(row['clean_name']) # 確保這裡的名字也是乾淨無空白的
+                        if c_name in ["nan", "None", "NaN", ""]: continue
                         
                         c_tel = "系統無紀錄"
                         for t_col in tel_cols:
-                            val = str(row[t_col]).replace("　", "").strip()
+                            val = str(row[t_col]).strip()
                             if val and val not in ["nan", "None", "NaN", ""]:
                                 c_tel = val
                                 break
                                 
                         c_addr = "系統無紀錄"
                         for a_col in addr_cols:
-                            val = str(row[a_col]).replace("　", "").strip()
+                            val = str(row[a_col]).strip()
                             if val and val not in ["nan", "None", "NaN", ""]:
                                 c_addr = val
                                 break
                             
-                        info_dict = {"電話": c_tel, "地址": c_addr}
-                        
-                        cust_info_map[c_key] = info_dict
-                        if c_name:
-                            cust_info_map[c_name] = info_dict
+                        cust_info_map[c_name] = {"電話": c_tel, "地址": c_addr}
             except: pass
 
         df['業務員'] = df['SALES_KEY'].map(name_map).fillna(df['SALES_KEY'])
         mask_sales_fail = df['業務員'] == df['SALES_KEY']
         if mask_sales_fail.any():
              df.loc[mask_sales_fail, '業務員'] = df.loc[mask_sales_fail, 'SALES_KEY'].str.zfill(4).map(name_map).fillna(df.loc[mask_sales_fail, 'SALES_KEY'])
-        
-        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY']).astype(str).str.replace("　", "").str.strip()
+        df['店家名稱'] = df['CUST_KEY'].map(cust_map).fillna(df['CUST_KEY'])
         
         return df, cust_info_map
 
@@ -218,10 +211,9 @@ if df is not None:
         st.markdown("<h2 style='text-align: center; color: #2C3E50;'>📱 行動查價站</h2>", unsafe_allow_html=True)
         st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
         
-        # 🌟 極簡選單 (加入通訊錄)
+        # 🌟 極簡選單
         menu_options = [
             "🏆 營運總覽 Dashboard", 
-            "📇 客戶通訊錄 (查電話地址)", 
             "🔎 店家查帳 (單一店家查價)", 
             "📋 全店家總表 (全台查價)", 
             "🎯 系列產品分析", 
@@ -231,47 +223,55 @@ if df is not None:
             
         analysis_mode = st.radio("請選擇工具：", menu_options, label_visibility="collapsed")
         
-        # 如果不是通訊錄，才顯示時間濾鏡 (因為通訊錄不該被時間限制)
-        if "通訊錄" not in analysis_mode:
-            st.markdown("---")
-            st.markdown("### 📅 時間軸濾鏡")
-            min_date = df['OUTDATE'].min().date()
-            max_date = df['OUTDATE'].max().date()
-            
-            date_preset = st.selectbox("⏳ 快速跳轉", [
-                "最近 7 天", "最近 30 天", "本月", "上個月", 
-                "最近 3 個月", "最近 6 個月", "最近 9 個月", 
-                "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"
-            ])
-            
-            if date_preset == "最近 7 天": start_d, end_d = max_date - pd.Timedelta(days=7), max_date
-            elif date_preset == "最近 30 天": start_d, end_d = max_date - pd.Timedelta(days=30), max_date
-            elif date_preset == "本月": start_d, end_d = max_date.replace(day=1), max_date
-            elif date_preset == "上個月": 
-                first_day_this_month = max_date.replace(day=1)
-                end_d = first_day_this_month - pd.Timedelta(days=1)
-                start_d = end_d.replace(day=1)
-            elif date_preset == "最近 3 個月": start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=3)).date(), max_date
-            elif date_preset == "最近 6 個月": start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=6)).date(), max_date
-            elif date_preset == "最近 9 個月": start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=9)).date(), max_date
-            elif date_preset == "今年以來 (YTD)": start_d, end_d = pd.Timestamp(f"{max_date.year}-01-01").date(), max_date
-            elif date_preset == "去年全年度": start_d, end_d = pd.Timestamp(f"{max_date.year-1}-01-01").date(), pd.Timestamp(f"{max_date.year-1}-12-31").date()
-            elif date_preset == "近 3 年": start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(years=3)).date(), max_date
-            else: start_d, end_d = min_date, max_date
-            
-            selected_start = st.date_input("🟢 起", value=start_d, min_value=min_date, max_value=max_date)
-            selected_end = st.date_input("🔴 迄", value=end_d, min_value=min_date, max_value=max_date)
-            
-            if selected_start > selected_end: st.error("⚠️ 起算日不能晚於結尾日喔！")
+        st.markdown("---")
+        st.markdown("### 📅 時間軸濾鏡")
+        min_date = df['OUTDATE'].min().date()
+        max_date = df['OUTDATE'].max().date()
+        
+        # 🚀 升級版：極致絲滑的快速時間選項
+        date_preset = st.selectbox("⏳ 快速跳轉", [
+            "最近 7 天", "最近 30 天", "本月", "上個月", 
+            "最近 3 個月", "最近 6 個月", "最近 9 個月", 
+            "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"
+        ])
+        
+        if date_preset == "最近 7 天": 
+            start_d, end_d = max_date - pd.Timedelta(days=7), max_date
+        elif date_preset == "最近 30 天": 
+            start_d, end_d = max_date - pd.Timedelta(days=30), max_date
+        elif date_preset == "本月": 
+            start_d, end_d = max_date.replace(day=1), max_date
+        elif date_preset == "上個月": 
+            first_day_this_month = max_date.replace(day=1)
+            end_d = first_day_this_month - pd.Timedelta(days=1)
+            start_d = end_d.replace(day=1)
+        elif date_preset == "最近 3 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=3)).date(), max_date
+        elif date_preset == "最近 6 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=6)).date(), max_date
+        elif date_preset == "最近 9 個月": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(months=9)).date(), max_date
+        elif date_preset == "今年以來 (YTD)": 
+            start_d, end_d = pd.Timestamp(f"{max_date.year}-01-01").date(), max_date
+        elif date_preset == "去年全年度": 
+            start_d, end_d = pd.Timestamp(f"{max_date.year-1}-01-01").date(), pd.Timestamp(f"{max_date.year-1}-12-31").date()
+        elif date_preset == "近 3 年": 
+            start_d, end_d = (pd.to_datetime(max_date) - pd.DateOffset(years=3)).date(), max_date
+        else: 
+            start_d, end_d = min_date, max_date
+        
+        selected_start = st.date_input("🟢 起", value=start_d, min_value=min_date, max_value=max_date)
+        selected_end = st.date_input("🔴 迄", value=end_d, min_value=min_date, max_value=max_date)
+        
+        if selected_start > selected_end: 
+            st.error("⚠️ 起算日不能晚於結尾日喔！")
 
-    # 建立日期過濾後的資料表 (通訊錄不使用此表)
-    if "通訊錄" not in analysis_mode:
-        v_df = df.copy()
-        if selected_start <= selected_end:
-            v_df = v_df[(v_df['OUTDATE'].dt.date >= selected_start) & (v_df['OUTDATE'].dt.date <= selected_end)]
+    v_df = df.copy()
+    if selected_start <= selected_end:
+        v_df = v_df[(v_df['OUTDATE'].dt.date >= selected_start) & (v_df['OUTDATE'].dt.date <= selected_end)]
 
     st.markdown(f"## {analysis_mode}")
-    if "全店家總表" not in analysis_mode and "報價照妖鏡" not in analysis_mode and "通訊錄" not in analysis_mode:
+    if "全店家總表" not in analysis_mode and "報價照妖鏡" not in analysis_mode:
         st.caption(f"🗓️ 數據範圍：**{selected_start}** 至 **{selected_end}**")
 
     # ==========================================
@@ -285,55 +285,6 @@ if df is not None:
         c3, c4 = st.columns(2)
         c3.metric("🏪 成交店數", f"{v_df['店家名稱'].nunique()}")
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
-
-    # ==========================================
-    # 📇 客戶通訊錄 (純查資料，不受時間限制)
-    # ==========================================
-    elif "通訊錄" in analysis_mode:
-        st.info("💡 這裡顯示資料庫中【所有】的客戶，不受左側日期濾鏡影響。找人最快！")
-        
-        # 建立乾淨的通訊錄清單
-        unique_custs = df[['CUST_KEY', '店家名稱', '業務員']].drop_duplicates(subset=['CUST_KEY'])
-        
-        def get_contact_info(key, name, info_type):
-            info = cust_info_map.get(key)
-            if not info: info = cust_info_map.get(name, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
-            return info.get(info_type, "系統無紀錄")
-
-        unique_custs['電話'] = unique_custs.apply(lambda x: get_contact_info(x['CUST_KEY'], x['店家名稱'], "電話"), axis=1)
-        unique_custs['地址'] = unique_custs.apply(lambda x: get_contact_info(x['CUST_KEY'], x['店家名稱'], "地址"), axis=1)
-        
-        dir_df = unique_custs[['店家名稱', 'CUST_KEY', '電話', '地址', '業務員']].rename(columns={'CUST_KEY': '客戶代號'})
-        dir_df = dir_df.sort_values('店家名稱')
-
-        # 搜尋引擎
-        search_kw = st.text_input("🔍 快速搜尋 (可直接輸入店名、代號或地址關鍵字)：", "")
-        
-        if search_kw:
-            mask = dir_df.apply(lambda row: row.astype(str).str.contains(search_kw, case=False).any(), axis=1)
-            show_df = dir_df[mask]
-        else:
-            show_df = dir_df
-
-        st.success(f"共找到 **{len(show_df)}** 筆客戶資料")
-        
-        # 🌟 如果搜尋結果小於等於 15 筆，自動彈出漂亮的手機版聯絡卡片
-        if len(show_df) <= 15 and len(show_df) > 0:
-            st.markdown("#### 📇 專屬聯絡卡片")
-            for _, row in show_df.iterrows():
-                st.markdown(f"""
-                <div style='background-color:#F4F6F9; padding:15px 20px; border-radius:12px; border-left:6px solid #3498DB; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
-                    <h5 style='color:#2C3E50; margin-top:0; font-weight:800; font-size:1.1em;'>{row['店家名稱']} <span style='font-size:0.7em; color:#7F8C8D; font-weight:normal;'>(代號: {row['客戶代號']} | 負責業務: {row['業務員']})</span></h5>
-                    <div style='color:#34495E; font-size:16px; line-height:1.6;'>
-                        <b>📞 電話：</b> {row['電話']} <br>
-                        <b>📍 地址：</b> {row['地址']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-        # 下方統一顯示完整資料表
-        st.markdown("---")
-        st.dataframe(show_df, use_container_width=True, hide_index=True, height=600)
 
     # ==========================================
     # 1. 店家查帳 / 我的客戶查帳 (極簡查價版 + 名片)
@@ -354,22 +305,21 @@ if df is not None:
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
             
-            sub = df[df['店家名稱'] == sel] 
-            target_cust_key = sub['CUST_KEY'].iloc[0] if not sub.empty else ""
-            
-            info = cust_info_map.get(target_cust_key)
-            if not info:
-                info = cust_info_map.get(sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
+            # 🌟 新增：店家專屬名片卡片 (確保 key 是去空白的乾淨版)
+            clean_sel = sel.strip()
+            info = cust_info_map.get(clean_sel, {"電話": "系統無紀錄", "地址": "系統無紀錄"})
             
             st.markdown(f"""
             <div style='background-color:#EBF5FB; padding:15px 20px; border-radius:12px; border-left:6px solid #1ABC9C; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
-                <h4 style='color:#0E6655; margin-top:0; font-weight:800;'>{sel} <span style='font-size:0.5em; color:#AAB7B8; font-weight:normal;'>(代號: {target_cust_key})</span></h4>
+                <h4 style='color:#0E6655; margin-top:0; font-weight:800;'>{clean_sel}</h4>
                 <div style='color:#117A65; font-size:16px; line-height:1.6;'>
                     <b>📞 電話：</b> {info['電話']} <br>
                     <b>📍 地址：</b> {info['地址']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            sub = df[df['店家名稱'] == sel] 
             
             tab_history, tab_1yr_summary = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單"])
             
