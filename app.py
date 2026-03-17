@@ -50,7 +50,7 @@ def find_file_recursive(target_names):
             if file.lower() in targets_lower: return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (修正名片連結邏輯) ---
+# --- 🔥 數據載入引擎 ---
 @st.cache_data(show_spinner="🚀 正在同步進銷存數據...", max_entries=1)
 def load_data_final():
     try:
@@ -77,27 +77,23 @@ def load_data_final():
         df['金額'] = pd.to_numeric(df['SUBTOT'], errors='coerce').fillna(0)
         df['數量'] = pd.to_numeric(df['OUTQTY'], errors='coerce').fillna(0)
         
-        # 產品解析
         code_col = next((c for c in df.columns if c.upper() in ['IT_NO', 'ITEM_NO', 'CODE']), df.columns[0])
         name_col = next((c for c in df.columns if c.upper() in ['TITLE', 'NAME', 'C_NAME', 'PROD_NAME']), code_col)
         df['產品編號'] = df[code_col].astype(str).str.strip()
         df['產品名稱'] = df[name_col].astype(str).str.strip()
         df['產品全名'] = "[" + df['產品編號'] + "] " + df['產品名稱']
 
-        # 系列解析
         def split_prod_code(code):
             match = re.search(r"([a-zA-Z]+)[\s-]*(\d+)", str(code))
             return (match.group(1).upper(), int(match.group(2))) if match else ("N/A", 0)
         df['Prefix'], df['ProdNum'] = zip(*df['產品編號'].apply(split_prod_code))
 
-        # 客戶代號清洗
         def super_clean(x): return str(x).strip()[:-2] if str(x).strip().endswith('.0') else str(x).strip()
         df['CUST_KEY'] = df['CUST_NO'].apply(super_clean)
         df['SALES_KEY'] = df['SUBNO'].apply(super_clean)
         
         name_map, cust_info_map, cust_id_to_name = {}, {}, {}
         
-        # 1. 業務員清單
         lab_path = find_file_recursive(['LABORER.DBF', 'laborer.dbf'])
         if lab_path:
             try:
@@ -109,23 +105,17 @@ def load_data_final():
                 name_map = l_df.set_index('k')[na_c].to_dict()
             except: pass
 
-        # 2. 客戶名片清單 (修正點：使用 COMPANY 作為主要對應)
         cust_path = find_file_recursive(['CUST.DBF', 'cust.dbf'])
         if cust_path:
             try:
                 from dbfread import DBF
                 c_df = pd.DataFrame(iter(DBF(cust_path, encoding='cp950', ignore_missing_memofile=True)))
                 c_id = next((c for c in c_df.columns if c.upper() in ['CUST_NO', 'CNO', 'ID']), c_df.columns[0])
-                # 這裡強制鎖定你截圖中看到的 COMPANY 欄位
                 c_na = next((c for c in c_df.columns if c.upper() in ['COMPANY', 'C_NA', 'NAME']), c_df.columns[1])
-                
                 c_df['clean_k'] = c_df[c_id].apply(super_clean)
                 c_df['clean_n'] = c_df[c_na].astype(str).str.strip()
-                
-                # 建立 ID -> 名稱 的對照表
                 cust_id_to_name = c_df.set_index('clean_k')['clean_n'].to_dict()
                 
-                # 建立 名稱 -> 名片資訊 的對照表
                 for _, row in c_df.iterrows():
                     c_name = str(row['clean_n'])
                     tel = next((str(row[c]).strip() for c in c_df.columns if c.upper() in ['TELE1', 'COMP_TEL', 'TEL1'] and str(row[c]).strip() not in ["", "nan"]), "系統無紀錄")
@@ -150,11 +140,11 @@ st.markdown("<h2 style='text-align: center;'>⚡ 峰揚行動查價站</h2>", un
 menu_options = ["🏆 營覽", "🔎 查店", "📋 底價", "🎯 系列", "🕵️ 業務"]
 analysis_mode = st.radio("選單", menu_options, horizontal=True, label_visibility="collapsed")
 
-# 🚀 時間濾鏡
+# 🚀 時間濾鏡 (語法已修正)
 min_d, max_d = res_df['OUTDATE'].min().date(), res_df['OUTDATE'].max().date()
 with st.expander("📅 時間範圍", expanded=False):
     preset = st.selectbox("⏳ 跳轉", ["最近 30 天", "最近 7 天", "本月", "最近 3 個月", "今年 (YTD)", "全部"])
-    if preset == "最近 7 天": s_d, e_d = max_d - pd.Timedelta(days=7), max_date = max_d
+    if preset == "最近 7 天": s_d, e_d = max_d - pd.Timedelta(days=7), max_d
     elif preset == "最近 30 天": s_d, e_d = max_d - pd.Timedelta(days=30), max_d
     elif preset == "本月": s_d, e_d = max_d.replace(day=1), max_d
     elif preset == "最近 3 個月": s_d, e_d = (pd.to_datetime(max_d) - pd.DateOffset(months=3)).date(), max_d
@@ -211,7 +201,7 @@ elif "查店" in analysis_mode:
         with t2:
             og = f_df[f_df['店家名稱'] == sel].groupby(['日期_CN', 'SOURNO'])['金額'].sum().reset_index().sort_values('日期_CN', ascending=False)
             d_sel = st.selectbox("點選看單筆內容", ["--- 請選擇 ---"] + [f"{x['日期_CN']} (單:{x['SOURNO']} / ${x['金額']:,.0f})" for _, x in og.iterrows()])
-            if " (單:" in d_sel:
+            if d_sel != "--- 請選擇 ---":
                 t_no = d_sel.split('單:')[1].split(' /')[0]
                 st.dataframe(f_df[(f_df['SOURNO'].astype(str) == t_no)][['產品全名', '數量', '金額']], use_container_width=True, hide_index=True)
 
