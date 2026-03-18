@@ -8,7 +8,7 @@ import zipfile
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="峰揚行動查價系統", page_icon="📱", layout="wide")
 
-# --- 💅 CSS 美學核心 (保留你原本的設定，移除會佔據版面的 Radio 按鈕特效) ---
+# --- 💅 CSS 美學核心 (極簡觸控優化版) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
@@ -16,6 +16,39 @@ st.markdown("""
     
     /* 強制全局文字顏色，避免手機深色模式反白看不到 */
     .stApp { color: #333333 !important; }
+    
+    /* 側邊欄漸層與陰影 */
+    [data-testid="stSidebar"] { 
+        background: linear-gradient(135deg, #FFF6E5 0%, #F0F4FF 100%) !important; 
+        border-right: none; 
+        box-shadow: 4px 0 15px rgba(0,0,0,0.05); 
+    }
+    [data-testid="stSidebar"] * { color: #333333 !important; }
+    
+    /* 🌟 導航按鈕 (果凍感) - 適合手機手指點擊 */
+    div.row-widget.stRadio > div { gap: 12px; }
+    div.row-widget.stRadio > div > label {
+        background-color: rgba(255, 255, 255, 0.7); padding: 15px 20px; border-radius: 30px; border: 2px solid transparent; cursor: pointer;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-weight: bold; color: #5D6D7E !important;
+    }
+    div.row-widget.stRadio > div > label:hover {
+        transform: translateY(-4px) scale(1.03); background: linear-gradient(120deg, #84FAB0 0%, #8FD3F4 100%); color: #0E6655 !important; border: 2px solid #FFFFFF; box-shadow: 0 10px 20px rgba(132, 250, 176, 0.4);
+    }
+    div.row-widget.stRadio > div > label > div:first-child { display: none; }
+    
+    /* 🌟 店家選擇按鈕組 (果凍感) - 用於替換 selectbox 以防止鍵盤 */
+    .cust-radio-group > div { gap: 12px !important; display: flex !important; flex-wrap: wrap !important; }
+    .cust-radio-group > div > label {
+        background-color: rgba(255, 255, 255, 0.7) !important; padding: 12px 18px !important; border-radius: 25px !important; 
+        border: 2px solid transparent !important; cursor: pointer !important; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03) !important; font-weight: bold !important; color: #5D6D7E !important;
+        margin-bottom: 0px !important;
+    }
+    .cust-radio-group > div > label:hover {
+        transform: translateY(-2px) !important; background: linear-gradient(120deg, #84FAB0 0%, #8FD3F4 100%) !important; 
+        color: #0E6655 !important; border: 2px solid #FFFFFF !important; box-shadow: 0 6px 12px rgba(132, 250, 176, 0.3) !important;
+    }
+    .cust-radio-group > div > label > div:first-child { display: none !important; } /* 隱藏小圓點 */
     
     /* 🌟 KPI 卡片果凍懸浮感 */
     div[data-testid="stMetric"], div[data-testid="metric-container"] {
@@ -39,7 +72,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (完全保留，不改動任何邏輯) ---
+# --- 🔥 數據載入引擎 (極致記憶體優化版 - 完全保留，不動資料) ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...", max_entries=1)
 def load_data_final():
     try:
@@ -186,34 +219,34 @@ else:
     cust_info_map = result[1] if len(result) > 1 else {}
 
 # ==========================================
-# 📱 UI 重構區 (改寫 Layout 邏輯，適應手機單手操作)
+# 📱 UI 重構區 (針對觸控優化，完全保留功能)
 # ==========================================
 if df is not None:
-    
-    # 頂部標題與數據摘要
-    st.markdown("<h2 style='text-align: center; color: #2C3E50; margin-bottom: 0px;'>📱 行動查價站</h2>", unsafe_allow_html=True)
-    st.caption(f"<div style='text-align: center; margin-bottom: 15px;'>📊 系統資料庫筆數: {len(df):,}</div>", unsafe_allow_html=True)
-    
-    # 手機友善：將導航選單改為「下拉式」，不佔據整個螢幕
-    menu_options = [
-        "🏆 營運總覽 Dashboard", 
-        "🔎 店家查帳 (單一店家查價)", 
-        "📋 全店家總表 (全台查價)", 
-        "🎯 系列產品分析", 
-        "🕵️‍♀️ 業務績效深鑽"
-    ]
-    analysis_mode = st.selectbox("📌 請選擇要使用的工具：", menu_options)
-    
-    # 手機友善：將非常佔空間的時間選擇器，放入「折疊面板」中
-    with st.expander("📅 點擊展開：調整搜尋時間範圍", expanded=False):
+    with st.sidebar:
+        st.markdown("<h2 style='text-align: center; color: #2C3E50;'>📱 行動查價站</h2>", unsafe_allow_html=True)
+        st.caption(f"<div style='text-align: center; margin-bottom: 20px;'>📊 總資料筆數: {len(df):,}</div>", unsafe_allow_html=True)
+        
+        menu_options = [
+            "🏆 營運總覽 Dashboard", 
+            "🔎 店家查帳 (單一店家查價)", 
+            "📋 全店家總表 (全台查價)", 
+            "🎯 系列產品分析", 
+            "🕵️‍♀️ 業務績效深鑽"
+        ]
+            
+        analysis_mode = st.radio("請選擇工具：", menu_options, label_visibility="collapsed")
+        
+        st.markdown("---")
+        st.markdown("### 📅 時間軸濾鏡")
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
+        # 🌟 修改預設日期為半年來 (索引 5)
         date_preset = st.selectbox("⏳ 快速跳轉", [
             "最近 7 天", "最近 30 天", "本月", "上個月", 
             "最近 3 個月", "最近 6 個月", "最近 9 個月", 
             "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"
-        ])
+        ], index=5)
         
         if date_preset == "最近 7 天": 
             start_d, end_d = max_date - pd.Timedelta(days=7), max_date
@@ -240,12 +273,8 @@ if df is not None:
         else: 
             start_d, end_d = min_date, max_date
         
-        # 手機並排設計
-        col_date1, col_date2 = st.columns(2)
-        with col_date1:
-            selected_start = st.date_input("🟢 搜尋起日", value=start_d, min_value=min_date, max_value=max_date)
-        with col_date2:
-            selected_end = st.date_input("🔴 搜尋迄日", value=end_d, min_value=min_date, max_value=max_date)
+        selected_start = st.date_input("🟢 起", value=start_d, min_value=min_date, max_value=max_date)
+        selected_end = st.date_input("🔴 迄", value=end_d, min_value=min_date, max_value=max_date)
         
         if selected_start > selected_end: 
             st.error("⚠️ 起算日不能晚於結尾日喔！")
@@ -254,18 +283,15 @@ if df is not None:
     time_mask = (df['OUTDATE'].dt.date >= selected_start) & (df['OUTDATE'].dt.date <= selected_end)
     v_df = df[time_mask]
 
-    st.markdown("---")
-    st.markdown(f"### {analysis_mode}")
+    st.markdown(f"## {analysis_mode}")
     if "全店家總表" not in analysis_mode:
-        st.caption(f"🗓️ 當前數據範圍：**{selected_start}** 至 **{selected_end}**")
+        st.caption(f"🗓️ 數據範圍：**{selected_start}** 至 **{selected_end}**")
 
     # ==========================================
-    # 以下核心邏輯 100% 保持原樣，一字未改
-    # ==========================================
-    
     # 🏆 營運總覽 Dashboard
+    # ==========================================
     if "營運總覽" in analysis_mode:
-        st.markdown("#### 📊 關鍵指標")
+        st.markdown("### 📊 關鍵指標")
         c1, c2 = st.columns(2)
         c1.metric("💰 區間總營收", f"${v_df['金額'].sum():,.0f}")
         c2.metric("📦 總出貨包數", f"{v_df['數量'].sum():,.0f}")
@@ -273,9 +299,13 @@ if df is not None:
         c3.metric("🏪 成交店數", f"{v_df['店家名稱'].nunique()}")
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
 
+    # ==========================================
     # 1. 店家查帳 (不複製資料，安全又快)
+    # ==========================================
     elif "店家查帳" in analysis_mode:
-        kw = st.text_input("🔍 1. 搜尋店家名稱 (可輸入關鍵字)", "")
+        
+        # 🌟 修改 UI：將搜尋框移到最上方，並且選擇框改為觸控按鈕以防止鍵盤
+        kw = st.text_input("🔍 搜尋店家名稱 (可輸入關鍵字)", "")
             
         if kw: 
             filter_df = v_df[v_df['店家名稱'].str.contains(kw, na=False)]
@@ -284,13 +314,23 @@ if df is not None:
             
         cust_group = filter_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).reset_index()
         
-        if cust_group.empty:
+        # 如果有店家，則顯示選擇按鈕
+        if not cust_group.empty:
+            cust_group['Label'] = cust_group.apply(lambda x: f"{x['店家名稱']} (${x['金額']:,.0f})", axis=1)
+            
+            # 使用一個折疊面板來隱藏大清單，以免佔滿螢幕
+            with st.expander(f"🎯 請選擇要查帳的店家 (共 {len(cust_group)} 家)", expanded=True):
+                # 🌟 使用 st.radio 配合自定義 CSS 類名 (.cust-radio-group) 來創建觸控按鈕
+                st.markdown('<div class="cust-radio-group">', unsafe_allow_html=True)
+                sel_label = st.radio("請選擇：", cust_group['Label'].tolist(), label_visibility="collapsed")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            # 取得選定的店家名稱
+            sel = sel_label.split(' ($')[0] if sel_label else "--"
+            
+        else:
             st.warning("⚠️ 該區間內無交易紀錄！")
             sel = "--"
-        else:
-            cust_group['Label'] = cust_group.apply(lambda x: f"{x['店家名稱']} (${x['金額']:,.0f})", axis=1)
-            sel_label = st.selectbox("🎯 2. 請選擇要查帳的店家", ["--- 請選擇 ---"] + cust_group['Label'].tolist())
-            sel = sel_label.split(' ($')[0] if sel_label != "--- 請選擇 ---" else "--"
             
         if sel != "--":
             st.success(f"已鎖定：**{sel}**")
@@ -320,6 +360,7 @@ if df is not None:
                 if og.empty:
                     st.info("該區間內無單筆紀錄。")
                 else:
+                    # 🌟 這裡使用下拉選單是安全的，因為點擊它只會讓您「滾動」選擇日期，並不會觸發文字搜尋功能，因此系統預設不會彈出鍵盤
                     d_sel = st.selectbox("選擇進貨單查看明細", og['L'].tolist())
                     if d_sel:
                         target_date = d_sel.split(' (')[0]
@@ -355,6 +396,10 @@ if df is not None:
                     
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
 
+    # ==========================================
+    # 以下功能與核心邏輯完全保留，未做任何更改
+    # ==========================================
+    
     # 2. 全店家一年進貨總表 (防當機煞車版)
     elif "全店家總表" in analysis_mode:
         st.info("💡 選擇特定業務與店家，系統自動還原近一年的最新拿貨底價。")
