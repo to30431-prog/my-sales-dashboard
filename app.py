@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
@@ -8,7 +8,7 @@ import zipfile
 # --- 🎨 頁面設定 ---
 st.set_page_config(page_title="峰揚行動查價系統", page_icon="📱", layout="wide")
 
-# --- 💅 CSS 美學核心 (保留你原本的設定，並加入按鈕樣式防鍵盤彈出) ---
+# --- 💅 CSS 美學核心 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
@@ -17,7 +17,7 @@ st.markdown("""
     /* 強制全局文字顏色，避免手機深色模式反白看不到 */
     .stApp { color: #333333 !important; }
     
-    /* 🌟 店家選擇按鈕組 (果凍感) - 用於替換 selectbox 以防止鍵盤彈出 */
+    /* 🌟 店家選擇按鈕組 (果凍感) - 替換 selectbox 防止鍵盤彈出 */
     .cust-radio-group > div { gap: 10px !important; display: flex !important; flex-wrap: wrap !important; }
     .cust-radio-group > div > label {
         background-color: rgba(255, 255, 255, 0.7) !important; padding: 12px 18px !important; border-radius: 25px !important; 
@@ -44,7 +44,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 核彈級檔案搜尋器 (完全保留) ---
+# --- 🔍 核彈級檔案搜尋器 ---
 def find_file_recursive(target_names):
     targets_lower = [t.lower() for t in target_names]
     for root, dirs, files in os.walk("."):
@@ -53,7 +53,7 @@ def find_file_recursive(target_names):
                 return os.path.join(root, file)
     return None
 
-# --- 🔥 數據載入引擎 (完全保留，不改動任何邏輯) ---
+# --- 🔥 數據載入引擎 ---
 @st.cache_data(show_spinner="🚀 正在全機掃描並載入數據，請稍候...", max_entries=1)
 def load_data_final():
     try:
@@ -200,15 +200,13 @@ else:
     cust_info_map = result[1] if len(result) > 1 else {}
 
 # ==========================================
-# 📱 UI 重構區 (改寫 Layout 邏輯，適應手機單手操作)
+# 📱 UI 重構區 
 # ==========================================
 if df is not None:
     
-    # 頂部標題與數據摘要
     st.markdown("<h2 style='text-align: center; color: #2C3E50; margin-bottom: 0px;'>📱 行動查價站</h2>", unsafe_allow_html=True)
     st.caption(f"<div style='text-align: center; margin-bottom: 15px;'>📊 系統資料庫筆數: {len(df):,}</div>", unsafe_allow_html=True)
     
-    # 手機友善：將導航選單改為「下拉式」，不佔據整個螢幕
     menu_options = [
         "🏆 營運總覽 Dashboard", 
         "🔎 店家查帳 (單一店家查價)", 
@@ -218,12 +216,10 @@ if df is not None:
     ]
     analysis_mode = st.selectbox("📌 請選擇要使用的工具：", menu_options)
     
-    # 手機友善：將非常佔空間的時間選擇器，放入「折疊面板」中
     with st.expander("📅 點擊展開：調整搜尋時間範圍", expanded=False):
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
-        # 預設為 index=5，也就是「最近 6 個月」
         date_preset = st.selectbox("⏳ 快速跳轉", [
             "最近 7 天", "最近 30 天", "本月", "上個月", 
             "最近 3 個月", "最近 6 個月", "最近 9 個月", 
@@ -255,7 +251,6 @@ if df is not None:
         else: 
             start_d, end_d = min_date, max_date
         
-        # 手機並排設計
         col_date1, col_date2 = st.columns(2)
         with col_date1:
             selected_start = st.date_input("🟢 搜尋起日", value=start_d, min_value=min_date, max_value=max_date)
@@ -265,7 +260,6 @@ if df is not None:
         if selected_start > selected_end: 
             st.error("⚠️ 起算日不能晚於結尾日喔！")
 
-    # 🔥 防當機核心：絕不複製資料，只用時間範圍做「切片 (Slice)」
     time_mask = (df['OUTDATE'].dt.date >= selected_start) & (df['OUTDATE'].dt.date <= selected_end)
     v_df = df[time_mask]
 
@@ -275,7 +269,7 @@ if df is not None:
         st.caption(f"🗓️ 當前數據範圍：**{selected_start}** 至 **{selected_end}**")
 
     # ==========================================
-    # 🏆 營運總覽 Dashboard (新增營收折線圖整合)
+    # 🏆 營運總覽 Dashboard
     # ==========================================
     if "營運總覽" in analysis_mode:
         st.markdown("#### 📊 關鍵指標")
@@ -286,33 +280,33 @@ if df is not None:
         c3.metric("🏪 成交店數", f"{v_df['店家名稱'].nunique()}")
         c4.metric("🧾 成交單數", f"{v_df['SOURNO'].nunique()}")
 
-        # 🌟 完美整合：營收趨勢折線圖
         st.markdown("---")
         st.markdown("#### 📈 每日營收趨勢")
         if not v_df.empty:
             trend = v_df.groupby('OUTDATE')['金額'].sum().reset_index()
-            # 加上 markers=True 讓手機點擊資料點更容易
             fig = px.line(trend, x='OUTDATE', y='金額', markers=True)
             
-            # 美化圖表背景，確保在手機上清晰可見
+            # 🌟 圖表防護鎖 (防誤觸變形)
             fig.update_layout(
                 xaxis_title="日期",
                 yaxis_title="營收金額",
                 plot_bgcolor="rgba(240, 248, 255, 0.4)", 
                 paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=30, b=10)
+                margin=dict(l=10, r=10, t=30, b=10),
+                dragmode=False # 禁用圖表拖曳平移
             )
-            # 把線條加粗，換成舒服的薄荷綠
+            fig.update_xaxes(fixedrange=True) # 禁用 X 軸縮放
+            fig.update_yaxes(fixedrange=True) # 禁用 Y 軸縮放
             fig.update_traces(line_color='#1ABC9C', line_width=3, marker=dict(size=6, color='#0E6655'))
-            st.plotly_chart(fig, use_container_width=True)
+            
+            # 隱藏工具列 config={'displayModeBar': False}
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info("該區間內無交易紀錄可繪製圖表。")
 
     # ==========================================
-    # 以下核心邏輯 100% 保持原樣，一字未改
+    # 1. 店家查帳
     # ==========================================
-
-    # 1. 店家查帳 (不複製資料，安全又快)
     elif "店家查帳" in analysis_mode:
         kw = st.text_input("🔍 搜尋店家名稱 (可輸入關鍵字)", "")
             
@@ -323,7 +317,6 @@ if df is not None:
             
         cust_group = filter_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).reset_index()
         
-        # 🌟 修改：將 selectbox 替換為不會彈出鍵盤的 radio 按鈕
         if not cust_group.empty:
             cust_group['Label'] = cust_group.apply(lambda x: f"{x['店家名稱']} (${x['金額']:,.0f})", axis=1)
             
@@ -400,7 +393,9 @@ if df is not None:
                     
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
 
-    # 2. 全店家一年進貨總表 (防當機煞車版)
+    # ==========================================
+    # 2. 全店家一年進貨總表
+    # ==========================================
     elif "全店家總表" in analysis_mode:
         st.info("💡 選擇特定業務與店家，系統自動還原近一年的最新拿貨底價。")
         
@@ -447,14 +442,15 @@ if df is not None:
                 agg_df = agg_df[['業務員', '店家名稱', '產品全名', '數量', '參考單價', '金額']]
                 agg_df['金額'] = agg_df['金額'].round(0)
                 
-                # 🔥 防當機安全煞車！
                 if len(agg_df) > 800:
                     st.warning(f"⚠️ 報表過於龐大 (共 {len(agg_df)} 筆)！為防止手機當機，目前僅顯示前 800 筆。請在上方選擇【業務】或【店家】來縮小範圍！")
                     st.dataframe(agg_df.head(800), use_container_width=True, hide_index=True, height=600)
                 else:
                     st.dataframe(agg_df, use_container_width=True, hide_index=True, height=600)
 
+    # ==========================================
     # 3. 系列分析
+    # ==========================================
     elif "系列" in analysis_mode:
         st.info("💡 輸入代碼前綴 (如 BN)，分析該系列總表現")
         c1, c2, c3 = st.columns(3)
@@ -471,8 +467,18 @@ if df is not None:
                 
                 st.markdown("#### 💰 銷售排行榜")
                 fig = px.bar(pr_amt, x='金額', y='產品全名', orientation='h', text_auto='.2s', color='金額', color_continuous_scale='Blues')
-                fig.update_layout(yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig, use_container_width=True)
+                
+                # 🌟 圖表防護鎖 (防誤觸變形)
+                fig.update_layout(
+                    yaxis=dict(autorange="reversed"),
+                    dragmode=False, # 禁用拖曳
+                    margin=dict(l=10, r=10, t=30, b=10)
+                )
+                fig.update_xaxes(fixedrange=True) # 禁用 X 軸縮放
+                fig.update_yaxes(fixedrange=True) # 禁用 Y 軸縮放
+                
+                # 隱藏工具列 config={'displayModeBar': False}
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
                 st.markdown("---")
                 selected_prod = st.selectbox("🎯 看單一產品賣給誰：", ["--- 請選擇 ---"] + pr_amt['產品全名'].tolist())
@@ -481,7 +487,9 @@ if df is not None:
                     buyer_rank = prod_df.groupby('店家名稱')[['數量', '金額']].sum().reset_index().sort_values('數量', ascending=False)
                     st.dataframe(buyer_rank, use_container_width=True, hide_index=True)
 
+    # ==========================================
     # 4. 業務績效深鑽
+    # ==========================================
     elif "業務績效" in analysis_mode:
         sales_list = sorted(v_df['業務員'].astype(str).unique())
         selected_sales = st.selectbox("👤 選擇業務員", ["--- 請選擇 ---"] + sales_list)
