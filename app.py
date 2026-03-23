@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
@@ -406,7 +406,7 @@ if df is not None:
                     
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
 
-            # 🌟 這裡是幫你加進來的新功能區塊
+            # 🌟 門市快篩區塊
             with tab_series_filter:
                 st.markdown(f"##### 🔍 篩選 **{clean_sel}** 買過的特定系列與最後叫貨日")
                 
@@ -534,7 +534,7 @@ if df is not None:
                     st.dataframe(buyer_rank, use_container_width=True, hide_index=True)
 
     # ==========================================
-    # 4. 業務績效深鑽
+    # 4. 業務績效深鑽 (已新增客戶貢獻排行榜)
     # ==========================================
     elif "業務績效" in analysis_mode:
         sales_list = sorted(v_df['業務員'].astype(str).unique())
@@ -544,12 +544,30 @@ if df is not None:
             s_df = v_df[v_df['業務員'] == selected_sales]
             k1, k2 = st.columns(2)
             k1.metric("💰 總結業績", f"${s_df['金額'].sum():,.0f}")
-            k2.metric("🏪 成交家數", f"{s_df['店家名稱'].nunique()}")
+            
+            # 計算成交家數並存成變數
+            unique_cust_count = s_df['店家名稱'].nunique()
+            k2.metric("🏪 成交家數", f"{unique_cust_count}")
             
             st.markdown("---")
-            cust_opts = s_df.groupby('店家名稱')['金額'].sum().sort_values(ascending=False).index.tolist()
-            if cust_opts:
-                selected_s_cust = st.selectbox("🔍 深度查帳 (看他賣了什麼給店家)：", ["--- 請選擇 ---"] + cust_opts)
+            
+            # 🌟 新增：客戶貢獻排行榜 (直接列出那 N 家店並依金額排序)
+            if unique_cust_count > 0:
+                st.markdown(f"#### 🏆 {selected_sales} 的客戶貢獻排行榜")
+                cust_rank_df = s_df.groupby('店家名稱')['金額'].sum().reset_index().sort_values('金額', ascending=False)
+                
+                # 數字格式化與欄位改名，讓手機看更直覺
+                cust_rank_df['金額'] = cust_rank_df['金額'].round(0)
+                cust_rank_df = cust_rank_df.rename(columns={'店家名稱': '店家', '金額': '貢獻業績($)'})
+                
+                # 顯示表格
+                st.dataframe(cust_rank_df, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                # 原本的深度查帳下拉選單
+                cust_opts = cust_rank_df['店家'].tolist()
+                selected_s_cust = st.selectbox("🔍 深度查帳 (看他賣了什麼給單一店家)：", ["--- 請選擇 ---"] + cust_opts)
                 
                 if selected_s_cust != "--- 請選擇 ---":
                     detail_df = s_df[s_df['店家名稱'] == selected_s_cust]
