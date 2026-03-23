@@ -312,7 +312,7 @@ if df is not None:
             st.info("該區間內無交易紀錄可繪製圖表。")
 
     # ==========================================
-    # 1. 店家查帳
+    # 1. 店家查帳 (已加入🎯 門市快篩查系列功能)
     # ==========================================
     elif "店家查帳" in analysis_mode:
         kw = st.text_input("🔍 搜尋店家名稱 (可輸入關鍵字)", "")
@@ -355,7 +355,8 @@ if df is not None:
             
             sub = df[df['店家名稱'] == sel] 
             
-            tab_history, tab_1yr_summary = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單"])
+            # 🌟 新增了第三個 Tab：門市快篩 (查系列)
+            tab_history, tab_1yr_summary, tab_series_filter = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單", "🎯 門市快篩 (查系列)"])
             
             with tab_history:
                 sub_time_filtered = filter_df[filter_df['店家名稱'] == sel]
@@ -404,6 +405,37 @@ if df is not None:
                     s_agg['金額'] = s_agg['金額'].round(0)
                     
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
+
+            # 🌟 這裡是幫你加進來的新功能區塊
+            with tab_series_filter:
+                st.markdown(f"##### 🔍 篩選 **{clean_sel}** 買過的特定系列與最後叫貨日")
+                
+                search_prefix = st.text_input("輸入系列代碼或關鍵字 (例如: TE)：", "").upper().strip()
+                    
+                if search_prefix:
+                    # 支援模糊搜尋產品全名，不怕代碼漏抓
+                    series_df = sub[sub['產品全名'].str.contains(search_prefix, case=False, na=False)]
+                    
+                    if series_df.empty:
+                        st.warning(f"這家店還沒有進過包含「{search_prefix}」的產品喔！")
+                    else:
+                        series_summary = series_df.groupby('產品全名').agg(
+                            總購買量=('數量', 'sum'),
+                            總貢獻額=('金額', 'sum'),
+                            最後叫貨日=('OUTDATE', 'max')
+                        ).reset_index()
+                        
+                        # 格式化日期與數字，並依照「最後叫貨日」由近到遠排序
+                        series_summary['最後叫貨日'] = series_summary['最後叫貨日'].dt.strftime('%Y-%m-%d')
+                        series_summary = series_summary.sort_values('最後叫貨日', ascending=False)
+                        
+                        series_summary['總購買量'] = series_summary['總購買量'].round(0)
+                        series_summary['總貢獻額'] = series_summary['總貢獻額'].round(0)
+                        
+                        st.success(f"🎯 幫你抓出 **{len(series_summary)}** 種包含「{search_prefix}」的品項！")
+                        st.dataframe(series_summary, use_container_width=True, hide_index=True)
+                else:
+                    st.info("💡 請在上方輸入系列代碼（例如 TE），系統會自動撈出這家店買過該系列的所有品項，以及他們最後一次叫貨的日期！")
 
     # ==========================================
     # 2. 全店家一年進貨總表
