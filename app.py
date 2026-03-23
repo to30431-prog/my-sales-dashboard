@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
@@ -214,17 +214,24 @@ if df is not None:
         "🎯 系列產品分析", 
         "🕵️‍♀️ 業務績效深鑽"
     ]
-    analysis_mode = st.selectbox("📌 請選擇要使用的工具：", menu_options)
+    
+    # 🌟 修改 1：主選單改用果凍按鈕，防止鍵盤彈出
+    st.markdown('<div class="cust-radio-group">', unsafe_allow_html=True)
+    analysis_mode = st.radio("📌 請選擇要使用的工具：", menu_options, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
     
     with st.expander("📅 點擊展開：調整搜尋時間範圍", expanded=False):
         min_date = df['OUTDATE'].min().date()
         max_date = df['OUTDATE'].max().date()
         
-        date_preset = st.selectbox("⏳ 快速跳轉", [
+        # 🌟 修改 2：快速跳轉改用果凍按鈕，防止鍵盤彈出
+        st.markdown('<div class="cust-radio-group">', unsafe_allow_html=True)
+        date_preset = st.radio("⏳ 快速跳轉", [
             "最近 7 天", "最近 30 天", "本月", "上個月", 
             "最近 3 個月", "最近 6 個月", "最近 9 個月", 
             "今年以來 (YTD)", "去年全年度", "近 3 年", "全部 5 年"
-        ], index=5)
+        ], index=5, horizontal=True, label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
         
         if date_preset == "最近 7 天": 
             start_d, end_d = max_date - pd.Timedelta(days=7), max_date
@@ -358,7 +365,12 @@ if df is not None:
                 if og.empty:
                     st.info("該區間內無單筆紀錄。")
                 else:
-                    d_sel = st.selectbox("選擇進貨單查看明細", og['L'].tolist())
+                    # 🌟 修改 3：進貨單明細改為 Expander 搭配果凍按鈕，完美解決平板鍵盤彈出問題！
+                    with st.expander("📝 點擊展開：選擇歷史進貨單", expanded=True):
+                        st.markdown('<div class="cust-radio-group">', unsafe_allow_html=True)
+                        d_sel = st.radio("選擇進貨單查看明細", og['L'].tolist(), label_visibility="collapsed")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
                     if d_sel:
                         target_date = d_sel.split(' (')[0]
                         target_sourno = d_sel.split('單號:')[1].split(' /')[0].strip() 
@@ -409,12 +421,14 @@ if df is not None:
             
             with col_f1:
                 sales_list = ["--- 全部業務 ---"] + sorted(df_1yr['業務員'].astype(str).unique().tolist())
+                # 這裡保留下拉選單，因為名單可能很長
                 selected_sales_filter = st.selectbox("👤 1. 請選擇業務：", sales_list)
             
             df_1yr_filtered = df_1yr[df_1yr['業務員'] == selected_sales_filter] if selected_sales_filter != "--- 全部業務 ---" else df_1yr
 
             with col_f2:
                 cust_list = ["--- 全部店家 ---"] + sorted(df_1yr_filtered['店家名稱'].astype(str).unique().tolist())
+                # 這裡保留下拉選單，因為名單可能很長
                 selected_cust_filter = st.selectbox("🏪 2. 請選擇店家：", cust_list)
             
             df_1yr_filtered = df_1yr_filtered[df_1yr_filtered['店家名稱'] == selected_cust_filter] if selected_cust_filter != "--- 全部店家 ---" else df_1yr_filtered
