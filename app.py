@@ -41,6 +41,17 @@ st.markdown("""
     /* 標題漸層色 */
     h1, h2 { background: -webkit-linear-gradient(45deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; letter-spacing: 1px; }
     h3, h4 { color: #2C3E50; font-weight: 700; }
+    
+    /* 🌟 將 Multiselect 標籤放大的魔法 CSS */
+    span[data-baseweb="tag"] {
+        font-size: 16px !important;
+        padding: 8px 12px !important;
+        margin: 4px !important;
+        background-color: #EBF5FB !important;
+        color: #117A65 !important;
+        border: 2px solid #1ABC9C !important;
+        border-radius: 8px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -212,7 +223,8 @@ if df is not None:
         "🔎 店家查帳 (單一店家查價)", 
         "📋 全店家總表 (全台查價)", 
         "🎯 系列產品分析", 
-        "🕵️‍♀️ 業務績效深鑽"
+        "🕵️‍♀️ 業務績效深鑽",
+        "🏢 體系連鎖店分析"  # 👈 新增功能選項
     ]
     
     # 🌟 修改 1：主選單改用果凍按鈕，防止鍵盤彈出
@@ -272,7 +284,7 @@ if df is not None:
 
     st.markdown("---")
     st.markdown(f"### {analysis_mode}")
-    if "全店家總表" not in analysis_mode:
+    if "全店家總表" not in analysis_mode and "體系連鎖" not in analysis_mode:
         st.caption(f"🗓️ 當前數據範圍：**{selected_start}** 至 **{selected_end}**")
 
     # ==========================================
@@ -312,7 +324,7 @@ if df is not None:
             st.info("該區間內無交易紀錄可繪製圖表。")
 
     # ==========================================
-    # 1. 店家查帳 (已加入🎯 門市快篩查系列功能)
+    # 1. 店家查帳 (已加入🎯 門市快篩查系列 與 🎁 查搭贈 功能)
     # ==========================================
     elif "店家查帳" in analysis_mode:
         kw = st.text_input("🔍 搜尋店家名稱 (可輸入關鍵字)", "")
@@ -355,8 +367,13 @@ if df is not None:
             
             sub = df[df['店家名稱'] == sel] 
             
-            # 🌟 新增了第三個 Tab：門市快篩 (查系列)
-            tab_history, tab_1yr_summary, tab_series_filter = st.tabs(["🧾 單筆歷史進貨", "📦 近一年專屬報價單", "🎯 門市快篩 (查系列)"])
+            # 🌟 新增了第四個 Tab：查底價搭贈
+            tab_history, tab_1yr_summary, tab_series_filter, tab_item_search = st.tabs([
+                "🧾 單筆紀錄", 
+                "📦 近一年總結", 
+                "🎯 系列快篩",
+                "🎁 查底價/搭贈" # 👈 新增的頁籤
+            ])
             
             with tab_history:
                 sub_time_filtered = filter_df[filter_df['店家名稱'] == sel]
@@ -406,7 +423,6 @@ if df is not None:
                     
                     st.dataframe(s_agg, use_container_width=True, hide_index=True, height=500)
 
-            # 🌟 門市快篩區塊
             with tab_series_filter:
                 st.markdown(f"##### 🔍 篩選 **{clean_sel}** 買過的特定系列與最後叫貨日")
                 
@@ -436,6 +452,45 @@ if df is not None:
                         st.dataframe(series_summary, use_container_width=True, hide_index=True)
                 else:
                     st.info("💡 請在上方輸入系列代碼（例如 TE），系統會自動撈出這家店買過該系列的所有品項，以及他們最後一次叫貨的日期！")
+
+            # 🔥 新增的第四個 Tab：全歷史查底價與抓 0 元搭贈
+            with tab_item_search:
+                st.markdown(f"##### 🔍 搜尋 {clean_sel} 的歷史底價與搭贈")
+                st.info("💡 輸入關鍵字（例如：雞肉），找出過去的成交底價與搭贈紀錄！(此區塊不受外層時間限制，為全歷史檢索)")
+                
+                search_item_kw = st.text_input("📦 輸入產品關鍵字：", placeholder="例如：DD315 或 雞肉", key="item_search_kw_mobile")
+                
+                if search_item_kw:
+                    target_df = sub[sub['產品全名'].str.contains(search_item_kw, case=False, na=False)].copy()
+                    
+                    if target_df.empty:
+                        st.warning(f"查無 {clean_sel} 關於「{search_item_kw}」的任何進貨紀錄。")
+                    else:
+                        target_df = target_df.sort_values('OUTDATE', ascending=False)
+                        # 避開除以 0 錯誤並計算真實單價
+                        target_df['真實單價'] = (target_df['金額'] / target_df['數量']).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
+                        target_df['交易性質'] = target_df['真實單價'].apply(lambda x: "🎁 0元搭贈" if x == 0 else "💰 正價品")
+                        
+                        total_qty = target_df['數量'].sum()
+                        valid_prices = target_df[target_df['真實單價'] > 0]['真實單價']
+                        max_p = valid_prices.max() if not valid_prices.empty else 0
+                        min_p = valid_prices.min() if not valid_prices.empty else 0
+                        
+                        m1, m2, m3 = st.columns(3)
+                        m1.metric("📦 總進貨", f"{total_qty:,.0f} 包")
+                        m2.metric("🔺 最高價", f"${max_p:,.1f}")
+                        m3.metric("🔻 最低價", f"${min_p:,.1f}")
+                        
+                        show_cols = ['日期_CN', '產品全名', '數量', '真實單價', '金額', '交易性質']
+                        display_df = target_df[show_cols].rename(columns={'日期_CN': '日期'})
+                        
+                        # 🔥 視覺特效：如果是搭贈，背景變成淺紅色高亮
+                        def highlight_zero(row):
+                            if row['真實單價'] == 0:
+                                return ['background-color: #FFE6E6; color: #D35400; font-weight: bold'] * len(row)
+                            return [''] * len(row)
+                        
+                        st.dataframe(display_df.style.apply(highlight_zero, axis=1), use_container_width=True, hide_index=True)
 
     # ==========================================
     # 2. 全店家一年進貨總表
@@ -534,7 +589,7 @@ if df is not None:
                     st.dataframe(buyer_rank, use_container_width=True, hide_index=True)
 
     # ==========================================
-    # 4. 業務績效深鑽 (已新增客戶貢獻排行榜)
+    # 4. 業務績效深鑽
     # ==========================================
     elif "業務績效" in analysis_mode:
         sales_list = sorted(v_df['業務員'].astype(str).unique())
@@ -581,3 +636,90 @@ if df is not None:
                         st.dataframe(detail_df[show_cols].sort_values('日期_CN', ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.warning("該區間內無成交紀錄。")
+
+    # ==========================================
+    # 5. 體系連鎖店分析 (查品牌) - 完美移植適配版
+    # ==========================================
+    elif "體系連鎖" in analysis_mode:
+        st.info("💡 步驟一：輸入關鍵字抓取。 步驟二：從候選名單剔除「撞名」非體系店。")
+
+        chain_kw = st.text_input("🔍 請輸入體系關鍵字：", placeholder="例如：魚中魚")
+
+        if chain_kw:
+            # --- 1. 暴力模糊比對：抓出所有包含關鍵字的原始資料 ---
+            # 這裡不受上方時間選擇器影響，才能抓到最完整的店名清單
+            raw_match_df = v_df[v_df['店家名稱'].str.contains(chain_kw, case=False, na=False)]
+
+            if raw_match_df.empty:
+                st.warning(f"⚠️ 在此時間區間內，查無包含「{chain_kw}」的店家。")
+            else:
+                # 提取不重複的店家名單
+                potential_stores = raw_match_df['店家名稱'].unique().tolist()
+
+                st.markdown("---")
+                st.markdown("##### 🎯 步驟二：確認分店名單")
+
+                # --- 2. 讓使用者手動微調 (預設全選) ---
+                selected_stores = st.multiselect(
+                    f"為您抓出 {len(potential_stores)} 家店。請點擊 'x' 移除不相關的：",
+                    options=potential_stores,
+                    default=potential_stores
+                )
+
+                if not selected_stores:
+                    st.warning("⚠️ 請至少保留一家分店來進行分析！")
+                else:
+                    # --- 3. 根據最終名單，篩選出真正的體系數據 ---
+                    final_chain_df = raw_match_df[raw_match_df['店家名稱'].isin(selected_stores)]
+                    final_branch_count = len(selected_stores)
+
+                    st.success(f"✅ 已鎖定 **{final_branch_count}** 家分店進行業績彙整。")
+
+                    # --- 體系整體 KPI ---
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("💰 體系總營收", f"${final_chain_df['金額'].sum():,.0f}")
+                    c2.metric("📦 總叫貨包數", f"{final_chain_df['數量'].sum():,.0f}")
+                    c3.metric("🏪 活躍分店", f"{final_branch_count} 家")
+
+                    st.markdown("---")
+
+                    # --- 雙榜單與排行 (分頁切換設計，手機專用) ---
+                    st.markdown(f"#### 🏆 【{chain_kw}】體系戰力榜")
+                    tab_store, tab_prod_qty, tab_prod_amt = st.tabs(["🏪 分店排行", "📦 品項(數量)", "💰 品項(業績)"])
+
+                    with tab_store:
+                        branch_sales = final_chain_df.groupby('店家名稱')[['金額', '數量']].sum().reset_index().sort_values('金額', ascending=False)
+                        
+                        # 手機圖表防呆設定
+                        fig_branch = px.bar(
+                            branch_sales.head(15), # 手機版圖表最多顯示前15家避免拉太長
+                            x='金額', 
+                            y='店家名稱', 
+                            orientation='h', 
+                            color='金額', 
+                            color_continuous_scale='Sunset'
+                        )
+                        fig_branch.update_layout(yaxis=dict(autorange="reversed"), margin=dict(l=10, r=10, t=10, b=10), dragmode=False)
+                        fig_branch.update_xaxes(fixedrange=True)
+                        fig_branch.update_yaxes(fixedrange=True)
+                        st.plotly_chart(fig_branch, use_container_width=True, config={'displayModeBar': False})
+                        
+                        show_branch = branch_sales.copy()
+                        show_branch['金額'] = show_branch['金額'].apply(lambda x: f"${x:,.0f}")
+                        show_branch['數量'] = show_branch['數量'].apply(lambda x: f"{x:,.0f} 包")
+                        st.dataframe(show_branch.rename(columns={'金額': '總業績', '數量': '總包數'}), use_container_width=True, hide_index=True)
+
+                    # 品項排行處理
+                    prod_rank_base = final_chain_df.groupby('產品全名')[['數量', '金額']].sum().reset_index()
+
+                    def format_df_sales(df_in):
+                        df_out = df_in.copy()
+                        df_out['金額'] = df_out['金額'].apply(lambda x: f"${x:,.0f}")
+                        df_out['數量'] = df_out['數量'].apply(lambda x: f"{x:,.0f} 包")
+                        return df_out.rename(columns={'數量': '總出貨量', '金額': '總業績'})
+
+                    with tab_prod_qty:
+                        st.dataframe(format_df_sales(prod_rank_base.sort_values('數量', ascending=False)), use_container_width=True, hide_index=True)
+
+                    with tab_prod_amt:
+                        st.dataframe(format_df_sales(prod_rank_base.sort_values('金額', ascending=False)), use_container_width=True, hide_index=True)
